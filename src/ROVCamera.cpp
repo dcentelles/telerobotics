@@ -57,7 +57,7 @@ void ROVCamera::Start()
 	rxbuffer = rxdlf->GetPayloadBuffer();
 
 	txStatePtr = txbuffer;
-	imgTrunkInfoPtr = txStatePtr + stateLength;
+	imgTrunkInfoPtr = (uint16_t*) (txStatePtr + stateLength);
 	imgTrunkPtr = ((uint8_t *)imgTrunkInfoPtr) + IMG_TRUNK_INFO_SIZE;
 
 	rxStatePtr = rxbuffer;
@@ -83,13 +83,13 @@ void ROVCamera::_UpdateCurrentStateFromLastMsg()
 void ROVCamera::_WaitForNewOrders(int timeout)
 {
 	//Wait for the next packet and call the callback
-	unsigned int elapsed = 0;
+	long elapsed = 0;
 	rxtimer.Reset();
 	while(elapsed < timeout)
 	{
 		if(device.GetRxFifoSize() > 0)
 		{
-			rxdlf << device;
+			device >> rxdlf;
 			_UpdateCurrentStateFromLastMsg();
 			break;
 		}
