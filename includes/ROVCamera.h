@@ -36,6 +36,7 @@ public:
 	void SetOrdersReceivedCallback(f_data);
 	void SetLastImgSentCallback(f_notification);
 
+	void SetChecksumType(DataLinkFrame::fcsType fcs);
 	void Start();
 private:
 	void _WaitForNewOrders(int millis_timeout);

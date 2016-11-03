@@ -19,7 +19,7 @@ ROVCamera::ROVCamera():service(this) {
 				   	  imgTrunkInfoLength +
 					  maxImgTrunkLength;
 
-	dlfcrctype = DataLinkFrame::fcsType::crc32;
+	dlfcrctype = DataLinkFrame::fcsType::crc16;
 	device.SetNamespace("camera");
 	buffer = new uint8_t[maxPacketLength + MAX_IMG_SIZE];
 	currentState = buffer;
@@ -31,6 +31,11 @@ ROVCamera::ROVCamera():service(this) {
 ROVCamera::~ROVCamera() {
 	// TODO Auto-generated destructor stub
 	delete buffer;
+}
+
+void ROVCamera::SetChecksumType(DataLinkFrame::fcsType fcs)
+{
+	dlfcrctype = fcs;
 }
 
 void ROVCamera::SendImage(void * _buf, unsigned int _length)
