@@ -31,7 +31,7 @@ public:
 	void SetDataReceivedCallback(f_data);
 	*/
 	//mode 2:
-	typedef std::function<void(void)> f_notification;
+	typedef std::function<void(ROVOperator &)> f_notification;
 
 	void SetImageReceivedCallback(f_notification);
 	void SetStateReceivedCallback(f_notification);
@@ -44,8 +44,10 @@ private:
 	f_notification imageReceivedCallback;
 	f_notification stateReceivedCallback;
 
+	std::mutex mutex;
 	uint8_t * buffer;
-	uint8_t * currentState;
+	uint8_t * currentState, * desiredState, * beginImgPtr, * beginLastImgPtr;
+	uint16_t lastImgSize;
 
 	CommsDeviceService device;
 	DataLinkFramePtr txdlf;
@@ -55,8 +57,14 @@ private:
 
 	DataLinkFrame::fcsType dlfcrctype;
 
+	///// TX ////
+	uint8_t * txStatePtr, * txbuffer;
+
 	///// RX ////
-	uint8_t * beginImgPtr;
+	uint8_t * rxStatePtr,     *imgTrunkPtr,  *rxbuffer,
+		    * currentImgPtr;
+
+	uint16_t * imgTrunkInfoPtr;
 
 	int stateLength;
 	int imgTrunkInfoLength;
@@ -67,8 +75,15 @@ private:
 	bool bigEndian;
 	Timer rxtimer;
 
-	void _lockStateMutex();
-	void _unlockStateMutex();
+	void _WaitForCurrentStateAndNextImageTrunk(int millis_timeout);
+	void _UpdateImgBufferFromLastMsg();
+	void _SendPacketWithDesiredState();
+	void _UpdateLastConfirmedStateFromLastMsg();
+	void _Work();
+
+	uint16_t _GetTrunkInfo();
+	uint16_t _GetTrunkSize(uint16_t rawInfo);
+	void _LastTrunkReceived(uint16_t trunkSize);
 };
 
 } /* namespace dcauv */

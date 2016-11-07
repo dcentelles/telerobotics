@@ -11,12 +11,12 @@
 
 namespace dcauv {
 
-void defaultLastImageSentCallback(void)
+void defaultLastImageSentCallback(ROVCamera & rovcamera)
 {
 	//Nothing to do
 }
 
-void defaultOrdersReceivedCallback(void)
+void defaultOrdersReceivedCallback(ROVCamera & rovcamera)
 {
 	//Nothing to do
 }
@@ -25,9 +25,9 @@ void defaultOrdersReceivedCallback(void)
 ROVCamera::ROVCamera():service(this) {
 	// TODO Auto-generated constructor stub
 	_SetEndianess();
-	stateLength = 40;
+	stateLength = MAX_IMG_STATE_LENGTH;
 	imgTrunkInfoLength = IMG_TRUNK_INFO_SIZE;
-	maxImgTrunkLength = 200;
+	maxImgTrunkLength = MAX_IMG_TRUNK_LENGTH;
 	maxPacketLength = stateLength +
 				   	  imgTrunkInfoLength +
 					  maxImgTrunkLength;
@@ -47,6 +47,8 @@ ROVCamera::ROVCamera():service(this) {
 
 ROVCamera::~ROVCamera() {
 	// TODO Auto-generated destructor stub
+	service.Stop();
+	device.Stop();
 	delete buffer;
 }
 
@@ -123,6 +125,9 @@ void ROVCamera::Start()
 	imgTrunkInfoPtr = (uint16_t*) (txStatePtr + stateLength);
 	imgTrunkPtr = ((uint8_t *)imgTrunkInfoPtr) + IMG_TRUNK_INFO_SIZE;
 
+	currentImgPtr = beginImgPtr; //No image in buffer
+	endImgPtr = currentImgPtr;   //
+
 	rxStatePtr = rxbuffer;
 	device.Start();
 	service.Start();
@@ -165,7 +170,7 @@ void ROVCamera::_WaitForNewOrders(int timeout)
 		{
 			device >> rxdlf;
 			_UpdateCurrentStateFromLastMsg();
-			ordersReceivedCallback();
+			ordersReceivedCallback(*this);
 			break;
 		}
 		Utils::Sleep(0.5);
@@ -179,16 +184,20 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 	//TODO: Prepare the next packet with the next image's trunk and send it
 	int bytesLeft = endImgPtr - currentImgPtr;
 	int nextTrunkLength;
+	uint16_t trunkInfo = 0;
 	if(bytesLeft > maxImgTrunkLength)
 	{
 		nextTrunkLength = maxImgTrunkLength;
 	}
 	else
+	{
+		trunkInfo |= IMG_LAST_TRUNK_FLAG;
 		nextTrunkLength = bytesLeft;
+	}
+
 
 	memcpy(txStatePtr, currentState, stateLength);
 
-	uint16_t trunkInfo = 0;
 	if(beginImgPtr == currentImgPtr)
 		trunkInfo |= IMG_FIRST_TRUNK_FLAG;
 
@@ -204,6 +213,8 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 	memcpy(imgTrunkPtr, currentImgPtr, nextTrunkLength);
 	currentImgPtr += nextTrunkLength;
 
+	device << txdlf;
+
 }
 
 void ROVCamera::_CheckIfEntireImgIsSent()
@@ -212,8 +223,10 @@ void ROVCamera::_CheckIfEntireImgIsSent()
 	if(imgInBuffer && currentImgPtr == endImgPtr)
 	{
 		imgInBuffer = false;
+		currentImgPtr = beginImgPtr;
+		endImgPtr = currentImgPtr;
 		imgInBufferCond.notify_one();
-		lastImageSentCallback();
+		lastImageSentCallback(*this);
 	}
 }
 

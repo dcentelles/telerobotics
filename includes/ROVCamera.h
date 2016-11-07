@@ -28,7 +28,7 @@ public:
 	void SetState(void * data, unsigned int length);
 
 	//typedef std::function<void(void*, unsigned int)> f_data;
-	typedef std::function<void(void)> f_notification;
+	typedef std::function<void(ROVCamera &)> f_notification;
 
 	void SetOrdersReceivedCallback(f_notification);//f_data);
 	void SetLastImgSentCallback(f_notification);
