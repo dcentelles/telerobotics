@@ -14,12 +14,9 @@
 #include <DataLinkFrame.h>
 #include <Utils.h>
 #include <mutex>
+#include <condition_variable>
 
 namespace dcauv {
-
-#define IMG_TRUNK_INFO_SIZE 2
-#define IMG_FIRST_TRUNK_FLAG 0x8000
-#define MAX_IMG_SIZE 32767 //(2^15-1)
 
 using namespace dccomms;
 
@@ -30,11 +27,15 @@ public:
 	void SendImage(void *, unsigned int);
 	void SetState(void * data, unsigned int length);
 
-	typedef std::function<void(void*, unsigned int)> f_data;
+	//typedef std::function<void(void*, unsigned int)> f_data;
 	typedef std::function<void(void)> f_notification;
 
-	void SetOrdersReceivedCallback(f_data);
+	void SetOrdersReceivedCallback(f_notification);//f_data);
 	void SetLastImgSentCallback(f_notification);
+
+	void GetCurrentState(void * dst);
+
+	bool SendingCurrentImage();
 
 	void SetChecksumType(DataLinkFrame::fcsType fcs);
 	void Start();
@@ -48,9 +49,12 @@ private:
 	void _SetEndianess();
 
 	void _Work();
-	mutex _mutex;
-	f_data ordersReceivedCallback;
-	f_notification lastImageSent;
+	std::mutex mutex;
+	condition_variable imgInBufferCond;
+
+	//f_data ordersReceivedCallback;
+	f_notification ordersReceivedCallback;
+	f_notification lastImageSentCallback;
 
 	uint8_t * buffer;
 	uint8_t * currentState;
@@ -68,6 +72,7 @@ private:
 
 	uint8_t * beginImgPtr;
 	uint8_t * currentImgPtr;
+	uint16_t * imgChksumPtr;
 	uint8_t * endImgPtr;
 
 	//// RX /////

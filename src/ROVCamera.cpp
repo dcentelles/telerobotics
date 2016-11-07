@@ -6,8 +6,21 @@
  */
 
 #include <ROVCamera.h>
+#include <Checksum.h>
+#include <Constants.h>
 
 namespace dcauv {
+
+void defaultLastImageSentCallback(void)
+{
+	//Nothing to do
+}
+
+void defaultOrdersReceivedCallback(void)
+{
+	//Nothing to do
+}
+
 
 ROVCamera::ROVCamera():service(this) {
 	// TODO Auto-generated constructor stub
@@ -25,6 +38,10 @@ ROVCamera::ROVCamera():service(this) {
 	currentState = buffer;
 	beginImgPtr = currentState + stateLength;
 	imgInBuffer = false;
+	lastImageSentCallback = &defaultLastImageSentCallback;
+	ordersReceivedCallback = &defaultOrdersReceivedCallback;
+
+	service.SetWork(&ROVCamera::_Work);
 
 }
 
@@ -40,17 +57,58 @@ void ROVCamera::SetChecksumType(DataLinkFrame::fcsType fcs)
 
 void ROVCamera::SendImage(void * _buf, unsigned int _length)
 {
-	while(imgInBuffer){}
 	//TODO: aply a hash to de img in order to check errors when reassembling trunks
+	std::unique_lock<std::mutex> lock(mutex);
+	while(imgInBuffer)
+	{
+		imgInBufferCond.wait(lock);
+	}
 	memcpy(beginImgPtr, _buf, _length);
-	endImgPtr = beginImgPtr + _length;
+	imgChksumPtr =  (uint16_t*) (beginImgPtr + _length);
+	endImgPtr = ((uint8_t *) imgChksumPtr) + IMG_CHKSUM_SIZE;
 	currentImgPtr = beginImgPtr;
+
+	uint32_t imgChksum = Checksum::crc32(beginImgPtr, _length);
+	if(bigEndian)
+	{
+		*imgChksumPtr = imgChksum;
+	}
+	else
+	{
+		Utils::IntSwitchEndian(imgChksumPtr, imgChksum);
+	}
+
+	//TEMPORAL CHECK
+	uint32_t crc = Checksum::crc32(beginImgPtr, _length + IMG_CHKSUM_SIZE);
+	if(crc != 0)
+	{
+		std::cerr << "internal error" << std::endl;
+	}
+
+
 	imgInBuffer = true;
+
+	//mutex is unlocked automatically when calling the unique_lock destructor:
+	//http://www.cplusplus.com/reference/mutex/unique_lock/
 }
 
-void ROVCamera::SetOrdersReceivedCallback(std::function<void(void*, unsigned int)> _callback)
+void ROVCamera::SetLastImgSentCallback(f_notification _callback)
 {
+	mutex.lock();
+	lastImageSentCallback = _callback;
+	mutex.unlock();
+}
+
+void ROVCamera::SetOrdersReceivedCallback(f_notification _callback)
+{
+	mutex.lock();
 	ordersReceivedCallback = _callback;
+	mutex.unlock();
+}
+
+bool ROVCamera::SendingCurrentImage()
+{
+	return imgInBuffer;
 }
 
 void ROVCamera::Start()
@@ -66,22 +124,33 @@ void ROVCamera::Start()
 	imgTrunkPtr = ((uint8_t *)imgTrunkInfoPtr) + IMG_TRUNK_INFO_SIZE;
 
 	rxStatePtr = rxbuffer;
-
 	device.Start();
+	service.Start();
 }
 
 void ROVCamera::_Work()
 {
-	_WaitForNewOrders(2000);
+	LOG_DEBUG("waiting for new orders...");
+	_WaitForNewOrders(5000);
+	mutex.lock();
 	_SendPacketWithCurrentStateAndImgTrunk();
 	_CheckIfEntireImgIsSent();
+	mutex.unlock();
 }
 
 void ROVCamera::_UpdateCurrentStateFromLastMsg()
 {
-	_mutex.lock();
+	mutex.lock();
 	memcpy(currentState, rxStatePtr, stateLength);
-	_mutex.unlock();
+	mutex.unlock();
+
+}
+
+void ROVCamera::GetCurrentState(void * dst)
+{
+	mutex.lock();
+	memcpy(dst,  currentState, stateLength);
+	mutex.unlock();
 
 }
 
@@ -96,6 +165,7 @@ void ROVCamera::_WaitForNewOrders(int timeout)
 		{
 			device >> rxdlf;
 			_UpdateCurrentStateFromLastMsg();
+			ordersReceivedCallback();
 			break;
 		}
 		Utils::Sleep(0.5);
@@ -120,16 +190,15 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 
 	uint16_t trunkInfo = 0;
 	if(beginImgPtr == currentImgPtr)
-		trunkInfo = IMG_FIRST_TRUNK_FLAG;
+		trunkInfo |= IMG_FIRST_TRUNK_FLAG;
 
-	trunkInfo |= bytesLeft;
+	trunkInfo |= nextTrunkLength;
 
     if(bigEndian)
     	*imgTrunkInfoPtr = trunkInfo;
     else
     {
-    	*(uint8_t*)imgTrunkInfoPtr = (uint8_t)(trunkInfo >> 8);
-    	*(((uint8_t*)imgTrunkInfoPtr)+1) = (uint8_t)(trunkInfo & 0xff);
+    	Utils::IntSwitchEndian(imgTrunkInfoPtr, trunkInfo);
     }
 
 	memcpy(imgTrunkPtr, currentImgPtr, nextTrunkLength);
@@ -143,7 +212,8 @@ void ROVCamera::_CheckIfEntireImgIsSent()
 	if(imgInBuffer && currentImgPtr == endImgPtr)
 	{
 		imgInBuffer = false;
-		lastImageSent();
+		imgInBufferCond.notify_one();
+		lastImageSentCallback();
 	}
 }
 
