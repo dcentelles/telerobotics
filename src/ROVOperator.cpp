@@ -30,6 +30,7 @@ ROVOperator::ROVOperator():service(this){
 	stateLength = MAX_IMG_STATE_LENGTH;
 	imgTrunkInfoLength = IMG_TRUNK_INFO_SIZE;
 	maxImgTrunkLength = MAX_IMG_TRUNK_LENGTH;
+	//minPacketLength = stateLength;
 	maxPacketLength = stateLength +
 				   	  imgTrunkInfoLength +
 					  maxImgTrunkLength;
@@ -41,8 +42,13 @@ ROVOperator::ROVOperator():service(this){
 	beginImgPtr = desiredState + stateLength;
 	beginLastImgPtr = beginImgPtr + MAX_IMG_SIZE;
 	device.SetNamespace("operator");
+	device.SetChecksumType(DataLinkFrame::crc16);
 	lastImgSize = 0;
 	imgInBuffer = false;
+	service.SetWork(&ROVOperator::_Work);
+
+	imageReceivedCallback = &defaultImageReceivedCallback;
+	stateReceivedCallback = &defaultStateReceivedCallback;
 }
 
 ROVOperator::~ROVOperator() {
@@ -102,9 +108,6 @@ void ROVOperator::Start()
 	imgTrunkInfoPtr = (uint16_t*) (rxStatePtr + stateLength);
 	imgTrunkPtr = ((uint8_t *)imgTrunkInfoPtr) + IMG_TRUNK_INFO_SIZE;
 
-	imageReceivedCallback = &defaultImageReceivedCallback;
-	stateReceivedCallback = &defaultStateReceivedCallback;
-
 	currentImgPtr = beginImgPtr;
 
 	device.Start();
@@ -128,6 +131,7 @@ void ROVOperator::_WaitForCurrentStateAndNextImageTrunk(int timeout)
 		if(device.GetRxFifoSize() > 0)
 		{
 			device >> rxdlf;
+			LOG_DEBUG("Received new packet with last state confirmed and next image trunk");
 			_UpdateLastConfirmedStateFromLastMsg();
 			_UpdateImgBufferFromLastMsg();
 			stateReceivedCallback(*this);
@@ -215,6 +219,8 @@ void ROVOperator::_SendPacketWithDesiredState()
 	memcpy(txStatePtr, desiredState, stateLength);
 	mutex.unlock();
 
+	txdlf->PayloadUpdated(stateLength);
+	LOG_DEBUG("Sending packet with new orders...");
 	device << txdlf;
 }
 

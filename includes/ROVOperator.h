@@ -70,6 +70,7 @@ private:
 	int imgTrunkInfoLength;
 	int maxImgTrunkLength;
 	int maxPacketLength;
+	//int minPacketLength;
 
 	bool imgInBuffer;
 	bool bigEndian;

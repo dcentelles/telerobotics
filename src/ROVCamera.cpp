@@ -40,7 +40,7 @@ ROVCamera::ROVCamera():service(this) {
 	imgInBuffer = false;
 	lastImageSentCallback = &defaultLastImageSentCallback;
 	ordersReceivedCallback = &defaultOrdersReceivedCallback;
-
+	device.SetChecksumType(DataLinkFrame::crc16);
 	service.SetWork(&ROVCamera::_Work);
 
 }
@@ -169,6 +169,7 @@ void ROVCamera::_WaitForNewOrders(int timeout)
 		if(device.GetRxFifoSize() > 0)
 		{
 			device >> rxdlf;
+			LOG_DEBUG("New orders received!");
 			_UpdateCurrentStateFromLastMsg();
 			ordersReceivedCallback(*this);
 			break;
@@ -213,6 +214,7 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 	memcpy(imgTrunkPtr, currentImgPtr, nextTrunkLength);
 	currentImgPtr += nextTrunkLength;
 
+	txdlf->PayloadUpdated(stateLength + imgTrunkInfoLength + nextTrunkLength);
 	device << txdlf;
 
 }
