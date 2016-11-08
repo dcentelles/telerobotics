@@ -136,7 +136,7 @@ void ROVCamera::Start()
 void ROVCamera::_Work()
 {
 	LOG_DEBUG("waiting for new orders...");
-	_WaitForNewOrders(5000);
+	_WaitForNewOrders(10000);
 	mutex.lock();
 	_SendPacketWithCurrentStateAndImgTrunk();
 	_CheckIfEntireImgIsSent();
@@ -168,8 +168,11 @@ void ROVCamera::_WaitForNewOrders(int timeout)
 	{
 		if(device.GetRxFifoSize() > 0)
 		{
-			device >> rxdlf;
-			LOG_DEBUG("New orders received!");
+			while(device.GetRxFifoSize() > 0)
+			{
+				device >> rxdlf;
+				LOG_DEBUG("New orders received!");
+			}
 			_UpdateCurrentStateFromLastMsg();
 			ordersReceivedCallback(*this);
 			break;
@@ -183,39 +186,51 @@ void ROVCamera::_WaitForNewOrders(int timeout)
 void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 {
 	//TODO: Prepare the next packet with the next image's trunk and send it
+	//unsigned long a1 = (unsigned long) endImgPtr;
+	//unsigned long a0 = (unsigned long) currentImgPtr;
+	if(device.BusyTransmitting())
+	{
+		LOG_DEBUG("BUG: Device busy transmitting...");
+		return;
+	}
 	int bytesLeft = endImgPtr - currentImgPtr;
 	int nextTrunkLength;
 	uint16_t trunkInfo = 0;
-	if(bytesLeft > maxImgTrunkLength)
+	if(bytesLeft > 0)
 	{
-		nextTrunkLength = maxImgTrunkLength;
+		if(bytesLeft > maxImgTrunkLength)
+		{
+			nextTrunkLength = maxImgTrunkLength;
+		}
+		else
+		{
+			trunkInfo |= IMG_LAST_TRUNK_FLAG;
+			nextTrunkLength = bytesLeft;
+		}
+
+
+		memcpy(txStatePtr, currentState, stateLength);
+
+		if(beginImgPtr == currentImgPtr)
+			trunkInfo |= IMG_FIRST_TRUNK_FLAG;
+
+		trunkInfo |= nextTrunkLength;
+
+		if(bigEndian)
+			*imgTrunkInfoPtr = trunkInfo;
+		else
+		{
+			Utils::IntSwitchEndian(imgTrunkInfoPtr, trunkInfo);
+		}
+
+		memcpy(imgTrunkPtr, currentImgPtr, nextTrunkLength);
+		currentImgPtr += nextTrunkLength;
+
+		txdlf->PayloadUpdated(stateLength + imgTrunkInfoLength + nextTrunkLength);
+		txdlf->checkFrame();
+		device << txdlf;
+		while(device.BusyTransmitting());
 	}
-	else
-	{
-		trunkInfo |= IMG_LAST_TRUNK_FLAG;
-		nextTrunkLength = bytesLeft;
-	}
-
-
-	memcpy(txStatePtr, currentState, stateLength);
-
-	if(beginImgPtr == currentImgPtr)
-		trunkInfo |= IMG_FIRST_TRUNK_FLAG;
-
-	trunkInfo |= nextTrunkLength;
-
-    if(bigEndian)
-    	*imgTrunkInfoPtr = trunkInfo;
-    else
-    {
-    	Utils::IntSwitchEndian(imgTrunkInfoPtr, trunkInfo);
-    }
-
-	memcpy(imgTrunkPtr, currentImgPtr, nextTrunkLength);
-	currentImgPtr += nextTrunkLength;
-
-	txdlf->PayloadUpdated(stateLength + imgTrunkInfoLength + nextTrunkLength);
-	device << txdlf;
 
 }
 
