@@ -154,28 +154,32 @@ void ROVOperator::_UpdateImgBufferFromLastMsg()
 	uint16_t trunkInfo = _GetTrunkInfo();
 	uint16_t trunkSize = _GetTrunkSize(trunkInfo);
 
-	if(trunkInfo & IMG_FIRST_TRUNK_FLAG) //the received trunk is the first trunk of an image
+	if(trunkInfo != 0)
 	{
-		memcpy(beginImgPtr, imgTrunkPtr, trunkSize);
-		currentImgPtr = beginImgPtr + trunkSize;
-		if(trunkInfo & IMG_LAST_TRUNK_FLAG) //the received trunk is also the last of an image (the image only has 1 trunk)
+		if(trunkInfo & IMG_FIRST_TRUNK_FLAG) //the received trunk is the first trunk of an image
 		{
-			_LastTrunkReceived(trunkSize);
-		}
-	}
-	else //the received trunk is not the first of an image
-	{
-		if(currentImgPtr != beginImgPtr) //first trunk has already been received
-		{
-			memcpy(currentImgPtr, imgTrunkPtr, trunkSize);
-			currentImgPtr += trunkSize;
-			if(trunkInfo & IMG_LAST_TRUNK_FLAG) //the received trunk is the last of an image
+			memcpy(beginImgPtr, imgTrunkPtr, trunkSize);
+			currentImgPtr = beginImgPtr + trunkSize;
+			if(trunkInfo & IMG_LAST_TRUNK_FLAG) //the received trunk is also the last of an image (the image only has 1 trunk)
 			{
 				_LastTrunkReceived(trunkSize);
 			}
 		}
-		//else, we are waiting for the first trunk of an image
+		else //the received trunk is not the first of an image
+		{
+			if(currentImgPtr != beginImgPtr) //first trunk has already been received
+			{
+				memcpy(currentImgPtr, imgTrunkPtr, trunkSize);
+				currentImgPtr += trunkSize;
+				if(trunkInfo & IMG_LAST_TRUNK_FLAG) //the received trunk is the last of an image
+				{
+					_LastTrunkReceived(trunkSize);
+				}
+			}
+			//else, we are waiting for the first trunk of an image
+		}
 	}
+	//else, packet without an image trunk
 
 
 

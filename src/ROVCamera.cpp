@@ -196,7 +196,10 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 	int bytesLeft = endImgPtr - currentImgPtr;
 	int nextTrunkLength;
 	uint16_t trunkInfo = 0;
-	if(bytesLeft > 0)
+
+	memcpy(txStatePtr, currentState, stateLength);
+
+	if(bytesLeft > 0) // == (ImgInBuffer == True)
 	{
 		if(bytesLeft > maxImgTrunkLength)
 		{
@@ -207,10 +210,6 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 			trunkInfo |= IMG_LAST_TRUNK_FLAG;
 			nextTrunkLength = bytesLeft;
 		}
-
-
-		memcpy(txStatePtr, currentState, stateLength);
-
 		if(beginImgPtr == currentImgPtr)
 			trunkInfo |= IMG_FIRST_TRUNK_FLAG;
 
@@ -227,10 +226,14 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 		currentImgPtr += nextTrunkLength;
 
 		txdlf->PayloadUpdated(stateLength + imgTrunkInfoLength + nextTrunkLength);
-		txdlf->checkFrame();
-		device << txdlf;
-		while(device.BusyTransmitting());
 	}
+	else
+	{
+		*imgTrunkInfoPtr = 0;
+		txdlf->PayloadUpdated(stateLength);
+	}
+	device << txdlf;
+	while(device.BusyTransmitting());
 
 }
 
