@@ -49,6 +49,8 @@ ROVOperator::ROVOperator():service(this){
 
 	imageReceivedCallback = &defaultImageReceivedCallback;
 	stateReceivedCallback = &defaultStateReceivedCallback;
+
+	SetLogName("ROVOperator");
 }
 
 ROVOperator::~ROVOperator() {
@@ -116,12 +118,12 @@ void ROVOperator::Start()
 
 void ROVOperator::_Work()
 {
-	LOG_DEBUG("waiting for new state from ROV...");
+	Log->debug("waiting for new state from ROV...");
 	_WaitForCurrentStateAndNextImageTrunk(10000);
 	if(!device.BusyTransmitting())
 		_SendPacketWithDesiredState();
 	else
-		LOG_DEBUG("POSSIBLE BUG: Device busy transmitting after wating for the current rov state");
+		Log->critical("Device busy transmitting after wating for the current rov state");
 }
 
 void ROVOperator::_WaitForCurrentStateAndNextImageTrunk(int timeout)
@@ -136,7 +138,7 @@ void ROVOperator::_WaitForCurrentStateAndNextImageTrunk(int timeout)
 			while(device.GetRxFifoSize() > 0)
 			{
 				device >> rxdlf;
-				LOG_DEBUG("Received new packet with last state confirmed and next image trunk");
+				Log->debug("Received new packet with last state confirmed and next image trunk");
 			}
 			_UpdateLastConfirmedStateFromLastMsg();
 			_UpdateImgBufferFromLastMsg();
@@ -146,7 +148,7 @@ void ROVOperator::_WaitForCurrentStateAndNextImageTrunk(int timeout)
 		Utils::Sleep(0.5);
 		elapsed = rxtimer.Elapsed();
 	}
-	LOG_DEBUG("Timeout when trying to receive feedback from the ROV!");
+	Log->warn("Timeout when trying to receive feedback from the ROV!");
 }
 
 void ROVOperator::_UpdateImgBufferFromLastMsg()
@@ -158,10 +160,12 @@ void ROVOperator::_UpdateImgBufferFromLastMsg()
 	{
 		if(trunkInfo & IMG_FIRST_TRUNK_FLAG) //the received trunk is the first trunk of an image
 		{
+			Log->debug("the received trunk is the first trunk of an image");
 			memcpy(beginImgPtr, imgTrunkPtr, trunkSize);
 			currentImgPtr = beginImgPtr + trunkSize;
 			if(trunkInfo & IMG_LAST_TRUNK_FLAG) //the received trunk is also the last of an image (the image only has 1 trunk)
 			{
+				Log->debug("the received trunk is also the last of an image (the image only has 1 trunk)");
 				_LastTrunkReceived(trunkSize);
 			}
 		}
@@ -173,13 +177,22 @@ void ROVOperator::_UpdateImgBufferFromLastMsg()
 				currentImgPtr += trunkSize;
 				if(trunkInfo & IMG_LAST_TRUNK_FLAG) //the received trunk is the last of an image
 				{
+					Log->debug("the received trunk is the last of an image");
 					_LastTrunkReceived(trunkSize);
 				}
 			}
+			else
+			{
 			//else, we are waiting for the first trunk of an image
+				Log->debug("waiting for the first trunk of an image");
+			}
 		}
 	}
-	//else, packet without an image trunk
+	else
+	{
+		//else, packet without an image trunk
+		Log->warn("packet received without an image trunk");
+	}
 
 
 
@@ -201,7 +214,7 @@ void ROVOperator::_LastTrunkReceived(uint16_t trunkSize)
 	}
 	else
 	{
-		LOG_DEBUG("image received with errors... (some packets were lost)");
+		Log->warn("image received with errors... (some packets were lost)");
 	}
 }
 
@@ -231,7 +244,7 @@ void ROVOperator::_SendPacketWithDesiredState()
 	mutex.unlock();
 
 	txdlf->PayloadUpdated(stateLength);
-	LOG_DEBUG("Sending packet with new orders...");
+	Log->debug("Sending packet with new orders...");
 	device << txdlf;
 	while(device.BusyTransmitting());
 }

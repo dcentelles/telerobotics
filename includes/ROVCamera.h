@@ -15,12 +15,13 @@
 #include <Utils.h>
 #include <mutex>
 #include <condition_variable>
+#include <Loggable.h>
 
 namespace dcauv {
 
 using namespace dccomms;
 
-class ROVCamera {
+class ROVCamera: Loggable {
 public:
 	ROVCamera();
 	virtual ~ROVCamera();

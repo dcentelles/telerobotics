@@ -43,6 +43,8 @@ ROVCamera::ROVCamera():service(this) {
 	device.SetChecksumType(DataLinkFrame::crc16);
 	service.SetWork(&ROVCamera::_Work);
 
+	SetLogName("ROVCamera");
+
 }
 
 ROVCamera::~ROVCamera() {
@@ -135,7 +137,7 @@ void ROVCamera::Start()
 
 void ROVCamera::_Work()
 {
-	LOG_DEBUG("waiting for new orders...");
+	Log->debug("waiting for new orders...");
 	_WaitForNewOrders(10000);
 	mutex.lock();
 	_SendPacketWithCurrentStateAndImgTrunk();
@@ -171,15 +173,16 @@ void ROVCamera::_WaitForNewOrders(int timeout)
 			while(device.GetRxFifoSize() > 0)
 			{
 				device >> rxdlf;
-				LOG_DEBUG("New orders received!");
+				Log->debug("New orders received!");
 			}
 			_UpdateCurrentStateFromLastMsg();
 			ordersReceivedCallback(*this);
-			break;
+			return;
 		}
 		Utils::Sleep(0.5);
 		elapsed = rxtimer.Elapsed();
 	}
+	Log->warn("Timeout when trying to receive new orders from the operator!");
 
 }
 
@@ -190,7 +193,7 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 	//unsigned long a0 = (unsigned long) currentImgPtr;
 	if(device.BusyTransmitting())
 	{
-		LOG_DEBUG("BUG: Device busy transmitting...");
+		Log->critical("BUG: Device busy transmitting...");
 		return;
 	}
 	int bytesLeft = endImgPtr - currentImgPtr;

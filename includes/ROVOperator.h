@@ -13,12 +13,13 @@
 #include <Utils.h>
 #include <CommsDeviceService.h>
 #include <mutex>
+#include <Loggable.h>
 
 namespace dcauv {
 
 using namespace dccomms;
 
-class ROVOperator {
+class ROVOperator: public Loggable {
 public:
 	ROVOperator();
 	virtual ~ROVOperator();
