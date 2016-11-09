@@ -1,0 +1,6 @@
+[submodule "deps/dccomms"]
+	path = deps/dccomms
+	url = https://github.com/dcentelles/dccomms.git
+[submodule "deps/cpplogging"]
+	path = deps/cpplogging
+	url = https://github.com/dcentelles/cpplogging.git
