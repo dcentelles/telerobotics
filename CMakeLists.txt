@@ -12,24 +12,29 @@ endif ()
  
 ####### LOAD DEPENDENCIES ######
 
-SET(TLROBOTICS_DEPS_DIR "deps/")
+SET(${PROJECT_NAME}_DEPS_DIR "deps/")
 
 if (NOT TARGET dccomms)
-	add_subdirectory(${TLROBOTICS_DEPS_DIR}/dccomms)
+	add_subdirectory(${${PROJECT_NAME}_DEPS_DIR}/dccomms)
 endif()
 
 if (NOT TARGET cpplogging)
-	add_subdirectory(${TLROBOTICS_DEPS_DIR}/cpplogging)
+	add_subdirectory(${${PROJECT_NAME}_DEPS_DIR}/cpplogging)
 endif()
 
 ###### 
 
-SET(TLROBOTICS_INCLUDE_DIRS "includes")
-file(GLOB TLROBOTICS_CPP_FILES "src/*.cpp") 
-SET(TLROBOTICS_CXX_COMPILE_FLAGS "-fPIC -std=c++0x")
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TLROBOTICS_CXX_COMPILE_FLAGS}")
+SET(${PROJECT_NAME}_INCLUDE_DIRS "includes")
+file(GLOB ${PROJECT_NAME}_CPP_FILES "src/*.cpp") 
+SET(${PROJECT_NAME}_CXX_COMPILE_FLAGS "-fPIC -std=c++0x")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${${PROJECT_NAME}_CXX_COMPILE_FLAGS}")
 SET(CMAKE_BUILD_TYPE Release)
 
-add_library(${PROJECT_NAME} SHARED ${TLROBOTICS_CPP_FILES})
-target_include_directories(${PROJECT_NAME} PUBLIC ${TLROBOTICS_INCLUDE_DIRS})
+add_library(${PROJECT_NAME} SHARED ${${PROJECT_NAME}_CPP_FILES})
+target_include_directories(${PROJECT_NAME} PUBLIC ${${PROJECT_NAME}_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} dccomms cpplogging)
+
+file(GLOB ${PROJECT_NAME}_INCLUDES "includes/*.h")
+install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION "lib")
+install(FILES ${${PROJECT_NAME}_INCLUDES} DESTINATION "include")
+	
