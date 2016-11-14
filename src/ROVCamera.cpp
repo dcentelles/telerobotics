@@ -53,7 +53,11 @@ ROVCamera::~ROVCamera() {
 	device.Stop();
 	delete buffer;
 }
-
+void ROVCamera::SetLogLevel(Loggable::LogLevel _level)
+{
+	Loggable::SetLogLevel(_level);
+	device.SetLogLevel(_level);
+}
 void ROVCamera::SetChecksumType(DataLinkFrame::fcsType fcs)
 {
 	dlfcrctype = fcs;
@@ -86,7 +90,7 @@ void ROVCamera::SendImage(void * _buf, unsigned int _length)
 	uint32_t crc = Checksum::crc32(beginImgPtr, _length + IMG_CHKSUM_SIZE);
 	if(crc != 0)
 	{
-		std::cerr << "internal error" << std::endl;
+		Log->critical("data link frame with errors before transmission");
 	}
 
 
@@ -233,7 +237,7 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 	else
 	{
 		*imgTrunkInfoPtr = 0;
-		txdlf->PayloadUpdated(stateLength);
+		txdlf->PayloadUpdated(stateLength + IMG_TRUNK_INFO_SIZE);
 	}
 	device << txdlf;
 	while(device.BusyTransmitting());

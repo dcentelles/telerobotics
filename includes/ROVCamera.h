@@ -20,8 +20,9 @@
 namespace dcauv {
 
 using namespace dccomms;
+using namespace cpplogging;
 
-class ROVCamera: Loggable {
+class ROVCamera: public Loggable {
 public:
 	ROVCamera();
 	virtual ~ROVCamera();
@@ -40,6 +41,9 @@ public:
 
 	void SetChecksumType(DataLinkFrame::fcsType fcs);
 	void Start();
+
+	virtual void SetLogLevel(Loggable::LogLevel);
+
 private:
 	void _WaitForNewOrders(int millis_timeout);
 	void _SendPacketWithCurrentStateAndImgTrunk();
