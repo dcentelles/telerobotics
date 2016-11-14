@@ -18,6 +18,7 @@
 namespace dcauv {
 
 using namespace dccomms;
+using namespace cpplogging;
 
 class ROVOperator: public Loggable {
 public:
@@ -41,6 +42,8 @@ public:
 	void GetLastConfirmedState(void *);
 
 	void Start();
+
+	virtual void SetLogLevel(Loggable::LogLevel);
 private:
 	f_notification imageReceivedCallback;
 	f_notification stateReceivedCallback;

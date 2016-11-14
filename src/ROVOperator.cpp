@@ -25,7 +25,14 @@ void defaultStateReceivedCallback(ROVOperator & rovOperator)
 }
 
 ROVOperator::ROVOperator():service(this){
-	// TODO Auto-generated constructor stub
+	rxbuffer = 0;
+	imgTrunkPtr = 0;
+	txbuffer = 0;
+	imgTrunkInfoPtr = 0;
+	currentImgPtr = 0;
+	rxStatePtr = 0;
+	txStatePtr = 0;
+
 	bigEndian = DataLinkFrame::IsBigEndian();
 	stateLength = MAX_IMG_STATE_LENGTH;
 	imgTrunkInfoLength = IMG_TRUNK_INFO_SIZE;
@@ -58,6 +65,12 @@ ROVOperator::~ROVOperator() {
 	service.Stop();
 	device.Stop();
 	delete buffer;
+}
+
+void ROVOperator::SetLogLevel(Loggable::LogLevel _level)
+{
+	Loggable::SetLogLevel(_level);
+	device.SetLogLevel(_level);
 }
 
 int ROVOperator::GetLastReceivedImage(void * data)
