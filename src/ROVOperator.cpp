@@ -37,17 +37,15 @@ ROVOperator::ROVOperator():service(this){
 	stateLength = MAX_IMG_STATE_LENGTH;
 	imgTrunkInfoLength = IMG_TRUNK_INFO_SIZE;
 	maxImgTrunkLength = MAX_IMG_TRUNK_LENGTH;
-	//minPacketLength = stateLength;
-	maxPacketLength = stateLength +
-				   	  imgTrunkInfoLength +
-					  maxImgTrunkLength;
+	maxPacketLength = MAX_PACKET_LENGTH;
 
 	dlfcrctype = DataLinkFrame::fcsType::crc16;
-	buffer = new uint8_t[maxPacketLength + stateLength + MAX_IMG_SIZE + IMG_CHKSUM_SIZE + MAX_IMG_SIZE];
+	buffer = new uint8_t[maxPacketLength + MAX_IMG_SIZE + IMG_CHKSUM_SIZE + MAX_IMG_SIZE];
 	currentState = buffer;
-	desiredState = currentState + stateLength;
-	beginImgPtr = desiredState + stateLength;
-	beginLastImgPtr = beginImgPtr + MAX_IMG_SIZE;
+
+	_UpdateStateSize(stateLength);
+
+
 	device.SetNamespace("operator");
 	device.SetChecksumType(DataLinkFrame::crc16);
 	lastImgSize = 0;
@@ -67,6 +65,23 @@ ROVOperator::~ROVOperator() {
 	delete buffer;
 }
 
+void ROVOperator::SetMaxImageTrunkLength(int _len)
+{
+	maxImgTrunkLength = _len;
+}
+
+void ROVOperator::SetStateSize(int _len)
+{
+	_UpdateStateSize(_len);
+}
+
+void ROVOperator::_UpdateStateSize(int _len)
+{
+	stateLength = _len;
+	desiredState = currentState + stateLength;
+	beginImgPtr = desiredState + stateLength;
+	beginLastImgPtr = beginImgPtr + MAX_IMG_SIZE;
+}
 void ROVOperator::SetLogLevel(Loggable::LogLevel _level)
 {
 	Loggable::SetLogLevel(_level);

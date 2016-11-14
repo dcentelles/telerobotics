@@ -28,9 +28,7 @@ ROVCamera::ROVCamera():service(this) {
 	stateLength = MAX_IMG_STATE_LENGTH;
 	imgTrunkInfoLength = IMG_TRUNK_INFO_SIZE;
 	maxImgTrunkLength = MAX_IMG_TRUNK_LENGTH;
-	maxPacketLength = stateLength +
-				   	  imgTrunkInfoLength +
-					  maxImgTrunkLength;
+	maxPacketLength = MAX_PACKET_LENGTH;
 
 	dlfcrctype = DataLinkFrame::fcsType::crc16;
 	device.SetNamespace("camera");
@@ -53,6 +51,18 @@ ROVCamera::~ROVCamera() {
 	device.Stop();
 	delete buffer;
 }
+
+void ROVCamera::SetMaxImageTrunkLength(int _len)
+{
+	maxImgTrunkLength = _len;
+}
+
+void ROVCamera::SetStateSize(int _len)
+{
+	stateLength = _len;
+	beginImgPtr = currentState + stateLength;
+}
+
 void ROVCamera::SetLogLevel(Loggable::LogLevel _level)
 {
 	Loggable::SetLogLevel(_level);

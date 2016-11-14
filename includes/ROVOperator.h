@@ -14,6 +14,7 @@
 #include <CommsDeviceService.h>
 #include <mutex>
 #include <Loggable.h>
+#include <Constants.h>
 
 namespace dcauv {
 
@@ -44,7 +45,12 @@ public:
 	void Start();
 
 	virtual void SetLogLevel(Loggable::LogLevel);
+
+	void SetMaxImageTrunkLength(int);
+	void SetStateSize(int);
 private:
+	void _UpdateStateSize(int);
+
 	f_notification imageReceivedCallback;
 	f_notification stateReceivedCallback;
 
