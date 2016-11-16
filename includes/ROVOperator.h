@@ -23,7 +23,7 @@ using namespace cpplogging;
 
 class ROVOperator: public Loggable {
 public:
-	ROVOperator();
+	ROVOperator(LinkType = halfDuplex);
 	virtual ~ROVOperator();
 	void SetDesiredState(const void * data, unsigned int length);
 
@@ -54,7 +54,8 @@ private:
 	f_notification imageReceivedCallback;
 	f_notification stateReceivedCallback;
 
-	std::mutex mutex;
+	LinkType linkType;
+	std::mutex immutex, statemutex;
 	uint8_t * buffer;
 	uint8_t * currentState, * desiredState, * beginImgPtr, * beginLastImgPtr;
 	uint16_t lastImgSize;
@@ -63,7 +64,12 @@ private:
 	DataLinkFramePtr txdlf;
 	DataLinkFramePtr rxdlf;
 
+	//for halfDuplex
 	ServiceThread<ROVOperator> service;
+
+	//for fullDuplex
+	ServiceThread<ROVOperator> txservice;
+	ServiceThread<ROVOperator> rxservice;
 
 	DataLinkFrame::fcsType dlfcrctype;
 
@@ -90,7 +96,11 @@ private:
 	void _UpdateImgBufferFromLastMsg();
 	void _SendPacketWithDesiredState();
 	void _UpdateLastConfirmedStateFromLastMsg();
-	void _Work();
+
+	void _Work(); //for half duplex
+
+	void _RxWork(); //for full duplex
+	void _TxWork(); //for full duplex
 
 	uint16_t _GetTrunkInfo();
 	uint16_t _GetTrunkSize(uint16_t rawInfo);

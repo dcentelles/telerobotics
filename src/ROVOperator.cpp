@@ -24,7 +24,7 @@ void defaultStateReceivedCallback(ROVOperator & rovOperator)
 
 }
 
-ROVOperator::ROVOperator():service(this){
+ROVOperator::ROVOperator(LinkType _linkType):service(this),txservice(this),rxservice(this){
 	rxbuffer = 0;
 	imgTrunkPtr = 0;
 	txbuffer = 0;
@@ -50,7 +50,14 @@ ROVOperator::ROVOperator():service(this){
 	device.SetChecksumType(DataLinkFrame::crc16);
 	lastImgSize = 0;
 	imgInBuffer = false;
-	service.SetWork(&ROVOperator::_Work);
+	linkType = _linkType;
+	if(linkType == halfDuplex)
+		service.SetWork(&ROVOperator::_Work);
+	else //full duplex
+	{
+		txservice.SetWork(&ROVOperator::_TxWork);
+		rxservice.SetWork(&ROVOperator::_RxWork);
+	}
 
 	imageReceivedCallback = &defaultImageReceivedCallback;
 	stateReceivedCallback = &defaultStateReceivedCallback;
@@ -60,7 +67,12 @@ ROVOperator::ROVOperator():service(this){
 
 ROVOperator::~ROVOperator() {
 	// TODO Auto-generated destructor stub
-	service.Stop();
+	if(service.IsRunning())
+		service.Stop();
+	if(txservice.IsRunning())
+		txservice.Stop();
+	if(rxservice.IsRunning())
+		rxservice.Stop();
 	device.Stop();
 	delete buffer;
 }
@@ -91,27 +103,27 @@ void ROVOperator::SetLogLevel(Loggable::LogLevel _level)
 int ROVOperator::GetLastReceivedImage(void * data)
 {
 	int imgSize;
-	mutex.lock();
+	immutex.lock();
 	memcpy(data, beginLastImgPtr, lastImgSize);
 	imgSize = lastImgSize;
-	mutex.unlock();
+	immutex.unlock();
 
 	return imgSize;
 }
 
 void ROVOperator::GetLastConfirmedState(void * data)
 {
-	mutex.lock();
+	statemutex.lock();
 	memcpy(data, currentState, stateLength);
-	mutex.unlock();
+	statemutex.unlock();
 
 }
 
 void ROVOperator::SetDesiredState(const void * _data, unsigned int _length)
 {
-	mutex.lock();
+	statemutex.lock();
 	memcpy(desiredState, _data, _length);
-	mutex.unlock();
+	statemutex.unlock();
 }
 
 void ROVOperator::SetImageReceivedCallback(f_notification _callback)
@@ -141,17 +153,31 @@ void ROVOperator::Start()
 	currentImgPtr = beginImgPtr;
 
 	device.Start();
-	service.Start();
+	if(linkType == halfDuplex)
+		service.Start();
+	else
+	{
+		txservice.Start();
+		rxservice.Start();
+	}
 }
 
 void ROVOperator::_Work()
 {
 	Log->debug("waiting for new state from ROV...");
 	_WaitForCurrentStateAndNextImageTrunk(10000);
-	if(!device.BusyTransmitting())
-		_SendPacketWithDesiredState();
-	else
-		Log->critical("Device busy transmitting after wating for the current rov state");
+	_SendPacketWithDesiredState();
+}
+
+void ROVOperator::_TxWork()
+{
+	_SendPacketWithDesiredState();
+}
+
+void ROVOperator::_RxWork()
+{
+	Log->debug("waiting for new state from ROV...");
+	_WaitForCurrentStateAndNextImageTrunk(10000);
 }
 
 void ROVOperator::_WaitForCurrentStateAndNextImageTrunk(int timeout)
@@ -233,10 +259,10 @@ void ROVOperator::_LastTrunkReceived(uint16_t trunkSize)
 	uint32_t crc = Checksum::crc32(beginImgPtr, blockSize);
 	if(crc == 0)
 	{
-		mutex.lock();
+		immutex.lock();
 		lastImgSize = blockSize - IMG_CHKSUM_SIZE;
 		memcpy(beginLastImgPtr, beginImgPtr, lastImgSize);
-		mutex.unlock();
+		immutex.unlock();
 
 		imageReceivedCallback(*this);
 	}
@@ -267,21 +293,26 @@ uint16_t ROVOperator::_GetTrunkSize(uint16_t rawInfo)
 
 void ROVOperator::_SendPacketWithDesiredState()
 {
-	mutex.lock();
-	memcpy(txStatePtr, desiredState, stateLength);
-	mutex.unlock();
+	if(!device.BusyTransmitting())
+	{
+		statemutex.lock();
+		memcpy(txStatePtr, desiredState, stateLength);
+		statemutex.unlock();
 
-	txdlf->PayloadUpdated(stateLength);
-	Log->debug("Sending packet with new orders...");
-	device << txdlf;
-	while(device.BusyTransmitting());
+		txdlf->PayloadUpdated(stateLength);
+		Log->debug("Sending packet with new orders...");
+		device << txdlf;
+		while(device.BusyTransmitting());
+	}
+	else
+		Log->critical("Device busy transmitting after wating for the current rov state");
 }
 
 void ROVOperator::_UpdateLastConfirmedStateFromLastMsg()
 {
-	mutex.lock();
+	statemutex.lock();
 	memcpy(currentState, rxStatePtr, stateLength);
-	mutex.unlock();
+	statemutex.unlock();
 }
 
 } /* namespace dcauv */

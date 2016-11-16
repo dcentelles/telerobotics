@@ -22,7 +22,7 @@ void defaultOrdersReceivedCallback(ROVCamera & rovcamera)
 }
 
 
-ROVCamera::ROVCamera():service(this) {
+ROVCamera::ROVCamera(LinkType _linkType):service(this),txservice(this),rxservice(this) {
 	// TODO Auto-generated constructor stub
 	_SetEndianess();
 	stateLength = MAX_IMG_STATE_LENGTH;
@@ -39,7 +39,15 @@ ROVCamera::ROVCamera():service(this) {
 	lastImageSentCallback = &defaultLastImageSentCallback;
 	ordersReceivedCallback = &defaultOrdersReceivedCallback;
 	device.SetChecksumType(DataLinkFrame::crc16);
-	service.SetWork(&ROVCamera::_Work);
+
+	linkType = _linkType;
+	if(linkType == halfDuplex)
+		service.SetWork(&ROVCamera::_Work);
+	else //full duplex
+	{
+		txservice.SetWork(&ROVCamera::_TxWork);
+		rxservice.SetWork(&ROVCamera::_RxWork);
+	}
 
 	SetLogName("ROVCamera");
 
@@ -47,7 +55,12 @@ ROVCamera::ROVCamera():service(this) {
 
 ROVCamera::~ROVCamera() {
 	// TODO Auto-generated destructor stub
-	service.Stop();
+	if(service.IsRunning())
+		service.Stop();
+	if(txservice.IsRunning())
+		txservice.Stop();
+	if(rxservice.IsRunning())
+		rxservice.Stop();
 	device.Stop();
 	delete buffer;
 }
@@ -76,7 +89,7 @@ void ROVCamera::SetChecksumType(DataLinkFrame::fcsType fcs)
 void ROVCamera::SendImage(void * _buf, unsigned int _length)
 {
 	//TODO: aply a hash to de img in order to check errors when reassembling trunks
-	std::unique_lock<std::mutex> lock(mutex);
+	std::unique_lock<std::mutex> lock(immutex);
 	while(imgInBuffer)
 	{
 		imgInBufferCond.wait(lock);
@@ -112,16 +125,16 @@ void ROVCamera::SendImage(void * _buf, unsigned int _length)
 
 void ROVCamera::SetLastImgSentCallback(f_notification _callback)
 {
-	mutex.lock();
+	immutex.lock();
 	lastImageSentCallback = _callback;
-	mutex.unlock();
+	immutex.unlock();
 }
 
 void ROVCamera::SetOrdersReceivedCallback(f_notification _callback)
 {
-	mutex.lock();
+	statemutex.lock();
 	ordersReceivedCallback = _callback;
-	mutex.unlock();
+	statemutex.unlock();
 }
 
 bool ROVCamera::SendingCurrentImage()
@@ -146,32 +159,62 @@ void ROVCamera::Start()
 
 	rxStatePtr = rxbuffer;
 	device.Start();
-	service.Start();
+
+	if(linkType == halfDuplex)
+		service.Start();
+	else
+	{
+		txservice.Start();
+		rxservice.Start();
+	}
 }
 
 void ROVCamera::_Work()
 {
 	Log->debug("waiting for new orders...");
 	_WaitForNewOrders(10000);
-	mutex.lock();
+	immutex.lock();
 	_SendPacketWithCurrentStateAndImgTrunk();
 	_CheckIfEntireImgIsSent();
-	mutex.unlock();
+	immutex.unlock();
+	while(device.BusyTransmitting());
 }
 
-void ROVCamera::_UpdateCurrentStateFromLastMsg()
+void ROVCamera::_TxWork()
 {
-	mutex.lock();
-	memcpy(currentState, rxStatePtr, stateLength);
-	mutex.unlock();
+	immutex.lock();
+	_SendPacketWithCurrentStateAndImgTrunk();
+	_CheckIfEntireImgIsSent();
+	immutex.unlock();
+	while(device.BusyTransmitting());
+}
 
+void ROVCamera::_RxWork()
+{
+	Log->debug("waiting for new orders...");
+	_WaitForNewOrders(10000);
+}
+
+
+void ROVCamera::_UpdateCurrentStateFromRxState()
+{
+	statemutex.lock();
+	memcpy(currentState, rxStatePtr, stateLength);
+	statemutex.unlock();
+
+}
+void ROVCamera::_UpdateTxStateFromCurrentState()
+{
+	statemutex.lock();
+	memcpy(txStatePtr, currentState, stateLength);
+	statemutex.unlock();
 }
 
 void ROVCamera::GetCurrentState(void * dst)
 {
-	mutex.lock();
+	statemutex.lock();
 	memcpy(dst,  currentState, stateLength);
-	mutex.unlock();
+	statemutex.unlock();
 
 }
 
@@ -189,7 +232,7 @@ void ROVCamera::_WaitForNewOrders(int timeout)
 				device >> rxdlf;
 				Log->debug("New orders received!");
 			}
-			_UpdateCurrentStateFromLastMsg();
+			_UpdateCurrentStateFromRxState();
 			ordersReceivedCallback(*this);
 			return;
 		}
@@ -214,7 +257,7 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 	int nextTrunkLength;
 	uint16_t trunkInfo = 0;
 
-	memcpy(txStatePtr, currentState, stateLength);
+	_UpdateTxStateFromCurrentState();
 
 	if(bytesLeft > 0) // == (ImgInBuffer == True)
 	{
@@ -250,7 +293,6 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 		txdlf->PayloadUpdated(stateLength + IMG_TRUNK_INFO_SIZE);
 	}
 	device << txdlf;
-	while(device.BusyTransmitting());
 
 }
 

@@ -25,7 +25,7 @@ using namespace cpplogging;
 
 class ROVCamera: public Loggable {
 public:
-	ROVCamera();
+	ROVCamera(LinkType = halfDuplex);
 	virtual ~ROVCamera();
 	void SendImage(void *, unsigned int);
 	void SetState(void * data, unsigned int length);
@@ -52,12 +52,17 @@ private:
 	void _SendPacketWithCurrentStateAndImgTrunk();
 	void _CheckIfEntireImgIsSent();
 
-	void _UpdateCurrentStateFromLastMsg();
-
+	void _UpdateCurrentStateFromRxState();
+	void _UpdateTxStateFromCurrentState();
 	void _SetEndianess();
 
-	void _Work();
-	std::mutex mutex;
+	void _Work(); //for half duplex
+
+	void _RxWork(); //for full duplex
+	void _TxWork(); //for full duplex
+
+	LinkType linkType;
+	std::mutex immutex, statemutex;
 	condition_variable imgInBufferCond;
 
 	//f_data ordersReceivedCallback;
@@ -70,7 +75,12 @@ private:
 	CommsDeviceService device;
 	DataLinkFramePtr txdlf;
 	DataLinkFramePtr rxdlf;
+	//for halfDuplex
 	ServiceThread<ROVCamera> service;
+
+	//for fullDuplex
+	ServiceThread<ROVCamera> txservice;
+	ServiceThread<ROVCamera> rxservice;
 
 	//// TX /////
 	uint8_t * txbuffer;
