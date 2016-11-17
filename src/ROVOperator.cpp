@@ -5,10 +5,10 @@
  *      Author: diego
  */
 
-#include <ROVOperator.h>
+#include <dccomms/ROVOperator.h>
 #include <Constants.h>
-#include <DataLinkFrame.h>
-#include <Checksum.h>
+#include <dccomms/DataLinkFrame.h>
+#include <dccomms/Checksum.h>
 
 namespace dcauv {
 

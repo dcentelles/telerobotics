@@ -10,8 +10,8 @@
 
 #include <functional>
 #include <iostream>
-#include <Utils.h>
-#include <CommsDeviceService.h>
+#include <dccomms/Utils.h>
+#include <dccomms/CommsDeviceService.h>
 #include <mutex>
 #include <Loggable.h>
 #include <Constants.h>

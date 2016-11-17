@@ -10,9 +10,9 @@
 
 #include <iostream>
 #include <functional>
-#include <CommsDeviceService.h>
-#include <DataLinkFrame.h>
-#include <Utils.h>
+#include <dccomms/CommsDeviceService.h>
+#include <dccomms/DataLinkFrame.h>
+#include <dccomms/Utils.h>
 #include <mutex>
 #include <condition_variable>
 #include <Loggable.h>

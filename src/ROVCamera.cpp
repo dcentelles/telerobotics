@@ -6,7 +6,7 @@
  */
 
 #include <ROVCamera.h>
-#include <Checksum.h>
+#include <dccomms/Checksum.h>
 #include <Constants.h>
 
 namespace dcauv {
