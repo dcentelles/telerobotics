@@ -5,8 +5,8 @@
  *      Author: diego
  */
 
-#include <ROVOperator.h>
-#include <Constants.h>
+#include <telerobotics/ROVOperator.h>
+#include <telerobotics/Constants.h>
 #include <dccomms/DataLinkFrame.h>
 #include <dccomms/Checksum.h>
 

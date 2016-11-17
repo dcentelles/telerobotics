@@ -5,9 +5,9 @@
  *      Author: diego
  */
 
-#include <ROVCamera.h>
+#include <telerobotics/ROVCamera.h>
 #include <dccomms/Checksum.h>
-#include <Constants.h>
+#include <telerobotics/Constants.h>
 
 namespace dcauv {
 
