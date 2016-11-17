@@ -5,7 +5,7 @@
  *      Author: diego
  */
 
-#include <dccomms/ROVOperator.h>
+#include <ROVOperator.h>
 #include <Constants.h>
 #include <dccomms/DataLinkFrame.h>
 #include <dccomms/Checksum.h>
