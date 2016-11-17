@@ -50,7 +50,8 @@ ROVCamera::ROVCamera(LinkType _linkType):service(this),txservice(this),rxservice
 	}
 
 	SetLogName("ROVCamera");
-
+	localAddr = 0;
+	remoteAddr = 0;
 }
 
 ROVCamera::~ROVCamera() {
@@ -63,6 +64,24 @@ ROVCamera::~ROVCamera() {
 		rxservice.Stop();
 	device.Stop();
 	delete buffer;
+}
+
+void ROVCamera::SetLocalAddr(int _addr)
+{
+	localAddr = _addr;
+	if(txdlf)
+	{
+		txdlf->SetSrcDir(localAddr);
+	}
+}
+
+void ROVCamera::SetRemoteAddr(int _addr)
+{
+	remoteAddr = _addr;
+	if(txdlf)
+	{
+		txdlf->SetDesDir(remoteAddr);
+	}
 }
 
 void ROVCamera::SetMaxImageTrunkLength(int _len)
@@ -146,6 +165,9 @@ void ROVCamera::Start()
 {
 	txdlf = DataLinkFrame::BuildDataLinkFrame(dlfcrctype);
 	rxdlf = DataLinkFrame::BuildDataLinkFrame(dlfcrctype);
+
+	SetLocalAddr(localAddr);
+	SetRemoteAddr(remoteAddr);
 
 	txbuffer = txdlf->GetPayloadBuffer();
 	rxbuffer = rxdlf->GetPayloadBuffer();

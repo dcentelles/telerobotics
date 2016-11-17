@@ -42,6 +42,9 @@ public:
 	int GetLastReceivedImage(void *);
 	void GetLastConfirmedState(void *);
 
+	void SetLocalAddr(int);
+	void SetRemoteAddr(int);
+
 	void Start();
 
 	virtual void SetLogLevel(Loggable::LogLevel);
@@ -105,6 +108,8 @@ private:
 	uint16_t _GetTrunkInfo();
 	uint16_t _GetTrunkSize(uint16_t rawInfo);
 	void _LastTrunkReceived(uint16_t trunkSize);
+
+	int localAddr, remoteAddr;
 };
 
 } /* namespace dcauv */

@@ -40,6 +40,9 @@ public:
 
 	bool SendingCurrentImage();
 
+	void SetLocalAddr(int);
+	void SetRemoteAddr(int);
+
 	void SetChecksumType(DataLinkFrame::fcsType fcs);
 	void Start();
 
@@ -107,6 +110,8 @@ private:
 	bool imgInBuffer;
 	bool bigEndian;
 	Timer rxtimer;
+
+	int localAddr, remoteAddr;
 };
 
 } /* namespace dcauv */

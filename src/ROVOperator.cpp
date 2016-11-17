@@ -63,6 +63,8 @@ ROVOperator::ROVOperator(LinkType _linkType):service(this),txservice(this),rxser
 	stateReceivedCallback = &defaultStateReceivedCallback;
 
 	SetLogName("ROVOperator");
+	localAddr = 0;
+	remoteAddr = 0;
 }
 
 ROVOperator::~ROVOperator() {
@@ -75,6 +77,24 @@ ROVOperator::~ROVOperator() {
 		rxservice.Stop();
 	device.Stop();
 	delete buffer;
+}
+
+void ROVOperator::SetLocalAddr(int _addr)
+{
+	localAddr = _addr;
+	if(txdlf)
+	{
+		txdlf->SetSrcDir(localAddr);
+	}
+}
+
+void ROVOperator::SetRemoteAddr(int _addr)
+{
+	remoteAddr = _addr;
+	if(txdlf)
+	{
+		txdlf->SetDesDir(remoteAddr);
+	}
 }
 
 void ROVOperator::SetMaxImageTrunkLength(int _len)
@@ -140,6 +160,9 @@ void ROVOperator::Start()
 {
 	txdlf = DataLinkFrame::BuildDataLinkFrame(dlfcrctype);
 	rxdlf = DataLinkFrame::BuildDataLinkFrame(dlfcrctype);
+
+	SetLocalAddr(localAddr);
+	SetRemoteAddr(remoteAddr);
 
 	txbuffer = txdlf->GetPayloadBuffer();
 	rxbuffer = rxdlf->GetPayloadBuffer();
