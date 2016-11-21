@@ -48,7 +48,7 @@ ROVCamera::ROVCamera(LinkType _linkType):service(this),txservice(this),rxservice
 		txservice.SetWork(&ROVCamera::_TxWork);
 		rxservice.SetWork(&ROVCamera::_RxWork);
 	}
-
+	device.SetLogName("ROVCamera:CommsDeviceService");
 	SetLogName("ROVCamera");
 	localAddr = 0;
 	remoteAddr = 0;

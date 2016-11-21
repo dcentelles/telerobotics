@@ -62,6 +62,7 @@ ROVOperator::ROVOperator(LinkType _linkType):service(this),txservice(this),rxser
 	imageReceivedCallback = &defaultImageReceivedCallback;
 	stateReceivedCallback = &defaultStateReceivedCallback;
 
+	device.SetLogName("ROVOperator:CommsDeviceService");
 	SetLogName("ROVOperator");
 	localAddr = 0;
 	remoteAddr = 0;
