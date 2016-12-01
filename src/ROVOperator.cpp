@@ -190,11 +190,13 @@ void ROVOperator::_Work()
 {
 	Log->debug("waiting for new state from ROV...");
 	_WaitForCurrentStateAndNextImageTrunk(10000);
+	device.WaitForDeviceReadyToTransmit();
 	_SendPacketWithDesiredState();
 }
 
 void ROVOperator::_TxWork()
 {
+	device.WaitForDeviceReadyToTransmit();
 	_SendPacketWithDesiredState();
 }
 
@@ -207,6 +209,24 @@ void ROVOperator::_RxWork()
 void ROVOperator::_WaitForCurrentStateAndNextImageTrunk(int timeout)
 {
 	//Wait for the next packet and call the callback
+
+	if(device.WaitForFramesFromRxFifo(timeout))
+	{
+		while(device.GetRxFifoSize() > 0)
+		{
+			device >> rxdlf;
+			Log->debug("Received new packet with last state confirmed and next image trunk");
+		}
+		_UpdateLastConfirmedStateFromLastMsg();
+		_UpdateImgBufferFromLastMsg();
+		stateReceivedCallback(*this);
+	}
+	else
+	{
+		Log->warn("Timeout when trying to receive feedback from the ROV!");
+	}
+
+	/*
 	long elapsed = 0;
 	rxtimer.Reset();
 	while(elapsed < timeout)
@@ -227,6 +247,7 @@ void ROVOperator::_WaitForCurrentStateAndNextImageTrunk(int timeout)
 		elapsed = rxtimer.Elapsed();
 	}
 	Log->warn("Timeout when trying to receive feedback from the ROV!");
+	*/
 }
 
 void ROVOperator::_UpdateImgBufferFromLastMsg()

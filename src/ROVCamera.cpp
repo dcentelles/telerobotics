@@ -199,7 +199,7 @@ void ROVCamera::_Work()
 	_SendPacketWithCurrentStateAndImgTrunk();
 	_CheckIfEntireImgIsSent();
 	immutex.unlock();
-	while(device.BusyTransmitting());
+	device.WaitForDeviceReadyToTransmit();
 }
 
 void ROVCamera::_TxWork()
@@ -208,7 +208,7 @@ void ROVCamera::_TxWork()
 	_SendPacketWithCurrentStateAndImgTrunk();
 	_CheckIfEntireImgIsSent();
 	immutex.unlock();
-	while(device.BusyTransmitting());
+	device.WaitForDeviceReadyToTransmit();
 }
 
 void ROVCamera::_RxWork()
@@ -243,6 +243,22 @@ void ROVCamera::GetCurrentState(void * dst)
 void ROVCamera::_WaitForNewOrders(int timeout)
 {
 	//Wait for the next packet and call the callback
+	if(device.WaitForFramesFromRxFifo(timeout))
+	{
+			while(device.GetRxFifoSize() > 0)
+			{
+				device >> rxdlf;
+				Log->debug("New orders received!");
+			}
+			_UpdateCurrentStateFromRxState();
+			ordersReceivedCallback(*this);
+	}
+	else
+	{
+		Log->warn("Timeout when trying to receive new orders from the operator!");
+	}
+
+	/*
 	long elapsed = 0;
 	rxtimer.Reset();
 	while(elapsed < timeout)
@@ -262,7 +278,7 @@ void ROVCamera::_WaitForNewOrders(int timeout)
 		elapsed = rxtimer.Elapsed();
 	}
 	Log->warn("Timeout when trying to receive new orders from the operator!");
-
+	*/
 }
 
 void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
