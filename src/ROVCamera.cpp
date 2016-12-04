@@ -25,16 +25,18 @@ void defaultOrdersReceivedCallback(ROVCamera & rovcamera)
 ROVCamera::ROVCamera(LinkType _linkType):service(this),txservice(this),rxservice(this) {
 	// TODO Auto-generated constructor stub
 	_SetEndianess();
-	stateLength = MAX_IMG_STATE_LENGTH;
+    rxStateLength = MAX_IMG_STATE_LENGTH;
+    txStateLength = MAX_IMG_STATE_LENGTH;
 	imgTrunkInfoLength = IMG_TRUNK_INFO_SIZE;
 	maxImgTrunkLength = MAX_IMG_TRUNK_LENGTH;
 	maxPacketLength = MAX_PACKET_LENGTH;
 
 	dlfcrctype = DataLinkFrame::fcsType::crc16;
 	device.SetNamespace("camera");
-	buffer = new uint8_t[maxPacketLength + MAX_IMG_SIZE];
-	currentState = buffer;
-	beginImgPtr = currentState + stateLength;
+    buffer = new uint8_t[maxPacketLength + MAX_IMG_STATE_LENGTH*2 + MAX_IMG_SIZE]; //buffer max size is orientative...
+    currentRxState = buffer;
+    currentTxState = currentRxState + rxStateLength;
+    beginImgPtr = currentTxState + txStateLength;
 	imgInBuffer = false;
 	lastImageSentCallback = &defaultLastImageSentCallback;
 	ordersReceivedCallback = &defaultOrdersReceivedCallback;
@@ -89,10 +91,16 @@ void ROVCamera::SetMaxImageTrunkLength(int _len)
 	maxImgTrunkLength = _len;
 }
 
-void ROVCamera::SetStateSize(int _len)
+void ROVCamera::SetTxStateSize(int _len)
 {
-	stateLength = _len;
-	beginImgPtr = currentState + stateLength;
+    txStateLength = _len;
+    beginImgPtr = currentTxState + txStateLength;
+}
+void ROVCamera::SetRxStateSize(int _len)
+{
+    rxStateLength = _len;
+    currentTxState = currentRxState + rxStateLength;
+    SetTxStateSize(txStateLength);
 }
 
 void ROVCamera::SetLogLevel(Loggable::LogLevel _level)
@@ -151,9 +159,9 @@ void ROVCamera::SetLastImgSentCallback(f_notification _callback)
 
 void ROVCamera::SetOrdersReceivedCallback(f_notification _callback)
 {
-	statemutex.lock();
+    rxstatemutex.lock();
 	ordersReceivedCallback = _callback;
-	statemutex.unlock();
+    rxstatemutex.unlock();
 }
 
 bool ROVCamera::SendingCurrentImage()
@@ -173,7 +181,7 @@ void ROVCamera::Start()
 	rxbuffer = rxdlf->GetPayloadBuffer();
 
 	txStatePtr = txbuffer;
-	imgTrunkInfoPtr = (uint16_t*) (txStatePtr + stateLength);
+    imgTrunkInfoPtr = (uint16_t*) (txStatePtr + txStateLength);
 	imgTrunkPtr = ((uint8_t *)imgTrunkInfoPtr) + IMG_TRUNK_INFO_SIZE;
 
 	currentImgPtr = beginImgPtr; //No image in buffer
@@ -218,26 +226,32 @@ void ROVCamera::_RxWork()
 }
 
 
-void ROVCamera::_UpdateCurrentStateFromRxState()
+void ROVCamera::_UpdateCurrentRxStateFromRxState()
 {
-	statemutex.lock();
-	memcpy(currentState, rxStatePtr, stateLength);
-	statemutex.unlock();
+    rxstatemutex.lock();
+    memcpy(currentRxState, rxStatePtr, rxStateLength);
+    rxstatemutex.unlock();
 
 }
-void ROVCamera::_UpdateTxStateFromCurrentState()
+void ROVCamera::_UpdateTxStateFromCurrentTxState()
 {
-	statemutex.lock();
-	memcpy(txStatePtr, currentState, stateLength);
-	statemutex.unlock();
+    txstatemutex.lock();
+    memcpy(txStatePtr, currentTxState, txStateLength);
+    txstatemutex.unlock();
 }
 
-void ROVCamera::GetCurrentState(void * dst)
+void ROVCamera::GetCurrentRxState(void * dst)
 {
-	statemutex.lock();
-	memcpy(dst,  currentState, stateLength);
-	statemutex.unlock();
+    rxstatemutex.lock();
+    memcpy(dst,  currentRxState, rxStateLength);
+    rxstatemutex.unlock();
+}
 
+void ROVCamera::SetCurrentTxState(void * src)
+{
+    txstatemutex.lock();
+    memcpy(currentTxState, src, txStateLength);
+    txstatemutex.unlock();
 }
 
 void ROVCamera::_WaitForNewOrders(int timeout)
@@ -250,35 +264,13 @@ void ROVCamera::_WaitForNewOrders(int timeout)
 				device >> rxdlf;
 				Log->debug("New orders received!");
 			}
-			_UpdateCurrentStateFromRxState();
+            _UpdateCurrentRxStateFromRxState();
 			ordersReceivedCallback(*this);
 	}
 	else
 	{
 		Log->warn("Timeout when trying to receive new orders from the operator!");
-	}
-
-	/*
-	long elapsed = 0;
-	rxtimer.Reset();
-	while(elapsed < timeout)
-	{
-		if(device.GetRxFifoSize() > 0)
-		{
-			while(device.GetRxFifoSize() > 0)
-			{
-				device >> rxdlf;
-				Log->debug("New orders received!");
-			}
-			_UpdateCurrentStateFromRxState();
-			ordersReceivedCallback(*this);
-			return;
-		}
-		Utils::Sleep(0.5);
-		elapsed = rxtimer.Elapsed();
-	}
-	Log->warn("Timeout when trying to receive new orders from the operator!");
-	*/
+    }
 }
 
 void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
@@ -295,7 +287,7 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 	int nextTrunkLength;
 	uint16_t trunkInfo = 0;
 
-	_UpdateTxStateFromCurrentState();
+    _UpdateTxStateFromCurrentTxState();
 
 	if(bytesLeft > 0) // == (ImgInBuffer == True)
 	{
@@ -323,12 +315,12 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 		memcpy(imgTrunkPtr, currentImgPtr, nextTrunkLength);
 		currentImgPtr += nextTrunkLength;
 
-		txdlf->PayloadUpdated(stateLength + imgTrunkInfoLength + nextTrunkLength);
+        txdlf->PayloadUpdated(txStateLength + imgTrunkInfoLength + nextTrunkLength);
 	}
 	else
 	{
 		*imgTrunkInfoPtr = 0;
-		txdlf->PayloadUpdated(stateLength + IMG_TRUNK_INFO_SIZE);
+        txdlf->PayloadUpdated(txStateLength + IMG_TRUNK_INFO_SIZE);
 	}
 	device << txdlf;
 

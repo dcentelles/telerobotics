@@ -36,7 +36,8 @@ public:
 	void SetOrdersReceivedCallback(f_notification);//f_data);
 	void SetLastImgSentCallback(f_notification);
 
-	void GetCurrentState(void * dst);
+        void GetCurrentRxState(void * dst);
+        void SetCurrentTxState(void * src);
 
 	bool SendingCurrentImage();
 
@@ -48,15 +49,16 @@ public:
 
 	virtual void SetLogLevel(Loggable::LogLevel);
 	void SetMaxImageTrunkLength(int);
-	void SetStateSize(int);
+        void SetRxStateSize(int);
+        void SetTxStateSize(int);
 
 private:
 	void _WaitForNewOrders(int millis_timeout);
 	void _SendPacketWithCurrentStateAndImgTrunk();
 	void _CheckIfEntireImgIsSent();
 
-	void _UpdateCurrentStateFromRxState();
-	void _UpdateTxStateFromCurrentState();
+        void _UpdateCurrentRxStateFromRxState();
+        void _UpdateTxStateFromCurrentTxState();
 	void _SetEndianess();
 
 	void _Work(); //for half duplex
@@ -65,7 +67,7 @@ private:
 	void _TxWork(); //for full duplex
 
 	LinkType linkType;
-	std::mutex immutex, statemutex;
+        std::mutex immutex, rxstatemutex, txstatemutex;
 	condition_variable imgInBufferCond;
 
 	//f_data ordersReceivedCallback;
@@ -73,7 +75,7 @@ private:
 	f_notification lastImageSentCallback;
 
 	uint8_t * buffer;
-	uint8_t * currentState;
+        uint8_t * currentRxState, *currentTxState;
 
 	CommsDeviceService device;
 	DataLinkFramePtr txdlf;
@@ -102,7 +104,7 @@ private:
 	DataLinkFrame::fcsType dlfcrctype;
 
 
-	int stateLength;
+        int rxStateLength, txStateLength;
 	int imgTrunkInfoLength;
 	int maxImgTrunkLength;
 	int maxPacketLength;
