@@ -54,6 +54,7 @@ ROVCamera::ROVCamera(LinkType _linkType):service(this),txservice(this),rxservice
 	SetLogName("ROVCamera");
 	localAddr = 0;
 	remoteAddr = 0;
+    txStateSet = false;
 }
 
 ROVCamera::~ROVCamera() {
@@ -252,6 +253,7 @@ void ROVCamera::SetCurrentTxState(void * src)
     txstatemutex.lock();
     memcpy(currentTxState, src, txStateLength);
     txstatemutex.unlock();
+    txStateSet = true;
 }
 
 void ROVCamera::_WaitForNewOrders(int timeout)
@@ -283,46 +285,51 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 		Log->critical("BUG: Device busy transmitting...");
 		return;
 	}
-	int bytesLeft = endImgPtr - currentImgPtr;
-	int nextTrunkLength;
-	uint16_t trunkInfo = 0;
+    if(txStateSet)
+    {
+        int bytesLeft = endImgPtr - currentImgPtr;
+        int nextTrunkLength;
+        uint16_t trunkInfo = 0;
 
-    _UpdateTxStateFromCurrentTxState();
+        _UpdateTxStateFromCurrentTxState();
 
-	if(bytesLeft > 0) // == (ImgInBuffer == True)
-	{
-		if(bytesLeft > maxImgTrunkLength)
-		{
-			nextTrunkLength = maxImgTrunkLength;
-		}
-		else
-		{
-			trunkInfo |= IMG_LAST_TRUNK_FLAG;
-			nextTrunkLength = bytesLeft;
-		}
-		if(beginImgPtr == currentImgPtr)
-			trunkInfo |= IMG_FIRST_TRUNK_FLAG;
+        if(bytesLeft > 0) // == (ImgInBuffer == True)
+        {
+            if(bytesLeft > maxImgTrunkLength)
+            {
+                nextTrunkLength = maxImgTrunkLength;
+            }
+            else
+            {
+                trunkInfo |= IMG_LAST_TRUNK_FLAG;
+                nextTrunkLength = bytesLeft;
+            }
+            if(beginImgPtr == currentImgPtr)
+                trunkInfo |= IMG_FIRST_TRUNK_FLAG;
 
-		trunkInfo |= nextTrunkLength;
+            trunkInfo |= nextTrunkLength;
 
-		if(bigEndian)
-			*imgTrunkInfoPtr = trunkInfo;
-		else
-		{
-			Utils::IntSwitchEndian(imgTrunkInfoPtr, trunkInfo);
-		}
+            if(bigEndian)
+                *imgTrunkInfoPtr = trunkInfo;
+            else
+            {
+                Utils::IntSwitchEndian(imgTrunkInfoPtr, trunkInfo);
+            }
 
-		memcpy(imgTrunkPtr, currentImgPtr, nextTrunkLength);
-		currentImgPtr += nextTrunkLength;
+            memcpy(imgTrunkPtr, currentImgPtr, nextTrunkLength);
+            currentImgPtr += nextTrunkLength;
 
-        txdlf->PayloadUpdated(txStateLength + imgTrunkInfoLength + nextTrunkLength);
-	}
-	else
-	{
-		*imgTrunkInfoPtr = 0;
-        txdlf->PayloadUpdated(txStateLength + IMG_TRUNK_INFO_SIZE);
-	}
-	device << txdlf;
+            txdlf->PayloadUpdated(txStateLength + imgTrunkInfoLength + nextTrunkLength);
+        }
+        else
+        {
+            *imgTrunkInfoPtr = 0;
+            txdlf->PayloadUpdated(txStateLength + IMG_TRUNK_INFO_SIZE);
+        }
+        device << txdlf;
+    }
+    else
+        Log->warn("Current state is not set yet");
 
 }
 

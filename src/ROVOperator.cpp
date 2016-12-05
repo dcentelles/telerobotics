@@ -34,16 +34,16 @@ ROVOperator::ROVOperator(LinkType _linkType):service(this),txservice(this),rxser
 	txStatePtr = 0;
 
 	bigEndian = DataLinkFrame::IsBigEndian();
-	stateLength = MAX_IMG_STATE_LENGTH;
 	imgTrunkInfoLength = IMG_TRUNK_INFO_SIZE;
 	maxImgTrunkLength = MAX_IMG_TRUNK_LENGTH;
 	maxPacketLength = MAX_PACKET_LENGTH;
 
 	dlfcrctype = DataLinkFrame::fcsType::crc16;
 	buffer = new uint8_t[maxPacketLength + MAX_IMG_SIZE + IMG_CHKSUM_SIZE + MAX_IMG_SIZE];
-	currentState = buffer;
 
-	_UpdateStateSize(stateLength);
+    currentRxState = buffer;
+    _UpdateRxStateSize(MAX_IMG_STATE_LENGTH);
+    _UpdateTxStateSize(MAX_IMG_STATE_LENGTH);
 
 
 	device.SetNamespace("operator");
@@ -66,6 +66,8 @@ ROVOperator::ROVOperator(LinkType _linkType):service(this),txservice(this),rxser
 	SetLogName("ROVOperator");
 	localAddr = 0;
 	remoteAddr = 0;
+
+    desiredStateSet = false;
 }
 
 ROVOperator::~ROVOperator() {
@@ -103,18 +105,32 @@ void ROVOperator::SetMaxImageTrunkLength(int _len)
 	maxImgTrunkLength = _len;
 }
 
-void ROVOperator::SetStateSize(int _len)
+void ROVOperator::SetRxStateSize(int _len)
 {
-	_UpdateStateSize(_len);
+    _UpdateRxStateSize(_len);
 }
 
-void ROVOperator::_UpdateStateSize(int _len)
+void ROVOperator::SetTxStateSize(int _len)
 {
-	stateLength = _len;
-	desiredState = currentState + stateLength;
-	beginImgPtr = desiredState + stateLength;
+    _UpdateTxStateSize(_len);
+}
+
+void ROVOperator::_UpdateRxStateSize(int _len)
+{
+    rxStateLength = _len;
+    desiredState = currentRxState + rxStateLength;
+    beginImgPtr = desiredState + txStateLength;
 	beginLastImgPtr = beginImgPtr + MAX_IMG_SIZE;
 }
+
+
+void ROVOperator::_UpdateTxStateSize(int _len)
+{
+    txStateLength = _len;
+    beginImgPtr = desiredState + txStateLength;
+    beginLastImgPtr = beginImgPtr + MAX_IMG_SIZE;
+}
+
 void ROVOperator::SetLogLevel(Loggable::LogLevel _level)
 {
 	Loggable::SetLogLevel(_level);
@@ -134,17 +150,18 @@ int ROVOperator::GetLastReceivedImage(void * data)
 
 void ROVOperator::GetLastConfirmedState(void * data)
 {
-	statemutex.lock();
-	memcpy(data, currentState, stateLength);
-	statemutex.unlock();
+    rxstatemutex.lock();
+    memcpy(data, currentRxState, rxStateLength);
+    rxstatemutex.unlock();
 
 }
 
 void ROVOperator::SetDesiredState(const void * _data, unsigned int _length)
 {
-	statemutex.lock();
+    txstatemutex.lock();
 	memcpy(desiredState, _data, _length);
-	statemutex.unlock();
+    txstatemutex.unlock();
+    desiredStateSet = true;
 }
 
 void ROVOperator::SetImageReceivedCallback(f_notification _callback)
@@ -171,7 +188,7 @@ void ROVOperator::Start()
 	txStatePtr = txbuffer;
 	rxStatePtr = rxbuffer;
 
-	imgTrunkInfoPtr = (uint16_t*) (rxStatePtr + stateLength);
+    imgTrunkInfoPtr = (uint16_t*) (rxStatePtr + rxStateLength);
 	imgTrunkPtr = ((uint8_t *)imgTrunkInfoPtr) + IMG_TRUNK_INFO_SIZE;
 
 	currentImgPtr = beginImgPtr;
@@ -224,30 +241,7 @@ void ROVOperator::_WaitForCurrentStateAndNextImageTrunk(int timeout)
 	else
 	{
 		Log->warn("Timeout when trying to receive feedback from the ROV!");
-	}
-
-	/*
-	long elapsed = 0;
-	rxtimer.Reset();
-	while(elapsed < timeout)
-	{
-		if(device.GetRxFifoSize() > 0)
-		{
-			while(device.GetRxFifoSize() > 0)
-			{
-				device >> rxdlf;
-				Log->debug("Received new packet with last state confirmed and next image trunk");
-			}
-			_UpdateLastConfirmedStateFromLastMsg();
-			_UpdateImgBufferFromLastMsg();
-			stateReceivedCallback(*this);
-			return;
-		}
-		Utils::Sleep(0.5);
-		elapsed = rxtimer.Elapsed();
-	}
-	Log->warn("Timeout when trying to receive feedback from the ROV!");
-	*/
+    }
 }
 
 void ROVOperator::_UpdateImgBufferFromLastMsg()
@@ -338,26 +332,33 @@ uint16_t ROVOperator::_GetTrunkSize(uint16_t rawInfo)
 
 void ROVOperator::_SendPacketWithDesiredState()
 {
-	if(!device.BusyTransmitting())
-	{
-		statemutex.lock();
-		memcpy(txStatePtr, desiredState, stateLength);
-		statemutex.unlock();
+    if(desiredStateSet)
+    {
+        if(!device.BusyTransmitting())
+        {
+            txstatemutex.lock();
+            memcpy(txStatePtr, desiredState, txStateLength);
+            txstatemutex.unlock();
 
-		txdlf->PayloadUpdated(stateLength);
-		Log->debug("Sending packet with new orders...");
-		device << txdlf;
-		while(device.BusyTransmitting());
-	}
-	else
-		Log->critical("Device busy transmitting after wating for the current rov state");
+            txdlf->PayloadUpdated(txStateLength);
+            Log->debug("Sending packet with new orders...");
+            device << txdlf;
+            while(device.BusyTransmitting());
+        }
+        else
+            Log->critical("Device busy transmitting after wating for the current rov state");
+    }
+    else
+    {
+        Log->warn("Desired state is not set yet");
+    }
 }
 
 void ROVOperator::_UpdateLastConfirmedStateFromLastMsg()
 {
-	statemutex.lock();
-	memcpy(currentState, rxStatePtr, stateLength);
-	statemutex.unlock();
+    rxstatemutex.lock();
+    memcpy(currentRxState, rxStatePtr, rxStateLength);
+    rxstatemutex.unlock();
 }
 
 } /* namespace dcauv */

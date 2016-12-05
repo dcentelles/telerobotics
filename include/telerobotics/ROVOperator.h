@@ -50,17 +50,22 @@ public:
 	virtual void SetLogLevel(Loggable::LogLevel);
 
 	void SetMaxImageTrunkLength(int);
-	void SetStateSize(int);
+        void SetRxStateSize(int);
+        void SetTxStateSize(int);
 private:
-	void _UpdateStateSize(int);
+        void _UpdateRxStateSize(int);
+        void _UpdateTxStateSize(int);
 
 	f_notification imageReceivedCallback;
 	f_notification stateReceivedCallback;
 
 	LinkType linkType;
-	std::mutex immutex, statemutex;
+        std::mutex immutex, txstatemutex, rxstatemutex;
 	uint8_t * buffer;
-	uint8_t * currentState, * desiredState, * beginImgPtr, * beginLastImgPtr;
+        uint8_t * currentRxState,
+                * desiredState,  // == currentTxState
+                * beginImgPtr,
+                * beginLastImgPtr;
 	uint16_t lastImgSize;
 
 	CommsDeviceService device;
@@ -85,7 +90,8 @@ private:
 
 	uint16_t * imgTrunkInfoPtr;
 
-	int stateLength;
+        int rxStateLength,
+            txStateLength;
 	int imgTrunkInfoLength;
 	int maxImgTrunkLength;
 	int maxPacketLength;
@@ -110,6 +116,7 @@ private:
 	void _LastTrunkReceived(uint16_t trunkSize);
 
 	int localAddr, remoteAddr;
+        bool desiredStateSet;
 };
 
 } /* namespace dcauv */

@@ -114,6 +114,7 @@ private:
 	Timer rxtimer;
 
 	int localAddr, remoteAddr;
+        bool txStateSet;
 };
 
 } /* namespace dcauv */
