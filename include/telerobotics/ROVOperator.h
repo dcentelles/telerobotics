@@ -25,7 +25,7 @@ class ROVOperator: public Loggable {
 public:
 	ROVOperator(LinkType = halfDuplex);
 	virtual ~ROVOperator();
-	void SetDesiredState(const void * data, unsigned int length);
+        void SetDesiredState(const void * data);
 
 	//http://stackoverflow.com/questions/2298242/callback-functions-in-c
 	/*
@@ -40,7 +40,7 @@ public:
 	void SetStateReceivedCallback(f_notification);
 
 	int GetLastReceivedImage(void *);
-	void GetLastConfirmedState(void *);
+        void GetLastConfirmedState(void *);
 
 	void SetLocalAddr(int);
 	void SetRemoteAddr(int);

@@ -329,7 +329,10 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
         device << txdlf;
     }
     else
+    {
         Log->warn("Current state is not set yet");
+        Utils::Sleep(1000);
+    }
 
 }
 

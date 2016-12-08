@@ -156,10 +156,10 @@ void ROVOperator::GetLastConfirmedState(void * data)
 
 }
 
-void ROVOperator::SetDesiredState(const void * _data, unsigned int _length)
+void ROVOperator::SetDesiredState(const void * _data)
 {
     txstatemutex.lock();
-	memcpy(desiredState, _data, _length);
+    memcpy(desiredState, _data, txStateLength);
     txstatemutex.unlock();
     desiredStateSet = true;
 }
@@ -351,6 +351,7 @@ void ROVOperator::_SendPacketWithDesiredState()
     else
     {
         Log->warn("Desired state is not set yet");
+        Utils::Sleep(1000);
     }
 }
 

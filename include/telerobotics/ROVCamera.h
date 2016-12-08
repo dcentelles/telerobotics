@@ -27,8 +27,7 @@ class ROVCamera: public Loggable {
 public:
 	ROVCamera(LinkType = halfDuplex);
 	virtual ~ROVCamera();
-	void SendImage(void *, unsigned int);
-	void SetState(void * data, unsigned int length);
+        void SendImage(void *, unsigned int);
 
 	//typedef std::function<void(void*, unsigned int)> f_data;
 	typedef std::function<void(ROVCamera &)> f_notification;
