@@ -137,6 +137,36 @@ void ROVOperator::SetLogLevel(Loggable::LogLevel _level)
 	device.SetLogLevel(_level);
 }
 
+void ROVOperator::SetLogName(string name)
+{
+    Loggable::SetLogName(name);
+    device.SetLogName(name + ":CommsDeviceService");
+}
+
+void ROVOperator::LogToConsole(bool c)
+{
+    Loggable::LogToConsole(c);
+    device.LogToConsole(c);
+}
+
+void ROVOperator::LogToFile(const string &filename)
+{
+    Loggable::LogToFile(filename);
+    device.LogToFile(filename);
+}
+
+void ROVOperator::FlushLog()
+{
+    Loggable::FlushLog();
+    device.FlushLog();
+}
+
+void ROVOperator::FlushLogOn(LogLevel level)
+{
+    Loggable::FlushLogOn(level);
+    device.FlushLogOn(level);
+}
+
 int ROVOperator::GetLastReceivedImage(void * data)
 {
 	int imgSize;

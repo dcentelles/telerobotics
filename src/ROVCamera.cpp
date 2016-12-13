@@ -109,6 +109,37 @@ void ROVCamera::SetLogLevel(Loggable::LogLevel _level)
 	Loggable::SetLogLevel(_level);
 	device.SetLogLevel(_level);
 }
+
+void ROVCamera::SetLogName(string name)
+{
+    Loggable::SetLogName(name);
+    device.SetLogName(name + ":CommsDeviceService");
+}
+
+void ROVCamera::LogToConsole(bool c)
+{
+    Loggable::LogToConsole(c);
+    device.LogToConsole(c);
+}
+
+void ROVCamera::LogToFile(const string &filename)
+{
+    Loggable::LogToFile(filename);
+    device.LogToFile(filename);
+}
+
+void ROVCamera::FlushLog()
+{
+    Loggable::FlushLog();
+    device.FlushLog();
+}
+
+void ROVCamera::FlushLogOn(LogLevel level)
+{
+    Loggable::FlushLogOn(level);
+    device.FlushLogOn(level);
+}
+
 void ROVCamera::SetChecksumType(DataLinkFrame::fcsType fcs)
 {
 	dlfcrctype = fcs;

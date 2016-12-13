@@ -48,6 +48,11 @@ public:
 	void Start();
 
 	virtual void SetLogLevel(Loggable::LogLevel);
+        virtual void SetLogName(string name);
+        virtual void FlushLog();
+        virtual void FlushLogOn(LogLevel);
+        virtual void LogToConsole(bool);
+        virtual void LogToFile(const string &filename);
 
 	void SetMaxImageTrunkLength(int);
         void SetRxStateSize(int);
