@@ -121,6 +121,7 @@ void ROVOperator::_UpdateRxStateSize(int _len)
     desiredState = currentRxState + rxStateLength;
     beginImgPtr = desiredState + txStateLength;
 	beginLastImgPtr = beginImgPtr + MAX_IMG_SIZE;
+    Log->debug("Set a new Rx-State length: {} bytes", _len);
 }
 
 
@@ -129,6 +130,7 @@ void ROVOperator::_UpdateTxStateSize(int _len)
     txStateLength = _len;
     beginImgPtr = desiredState + txStateLength;
     beginLastImgPtr = beginImgPtr + MAX_IMG_SIZE;
+    Log->debug("Set a new Tx-State length: {} bytes", _len);
 }
 
 void ROVOperator::SetLogLevel(Loggable::LogLevel _level)
@@ -152,7 +154,7 @@ void ROVOperator::LogToConsole(bool c)
 void ROVOperator::LogToFile(const string &filename)
 {
     Loggable::LogToFile(filename);
-    device.LogToFile(filename);
+    device.LogToFile(filename + "_service");
 }
 
 void ROVOperator::FlushLog()
@@ -243,26 +245,28 @@ void ROVOperator::_Work()
 
 void ROVOperator::_TxWork()
 {
+    Log->debug("TX: Waiting for device ready to transmit...");
 	device.WaitForDeviceReadyToTransmit();
 	_SendPacketWithDesiredState();
 }
 
 void ROVOperator::_RxWork()
 {
-	Log->debug("waiting for new state from ROV...");
+    Log->debug("RX: waiting for new state from ROV...");
 	_WaitForCurrentStateAndNextImageTrunk(10000);
 }
 
 void ROVOperator::_WaitForCurrentStateAndNextImageTrunk(int timeout)
 {
 	//Wait for the next packet and call the callback
-
+    Log->debug("RX: waiting for frames...");
 	if(device.WaitForFramesFromRxFifo(timeout))
 	{
+        Log->debug("RX: new frames in RX FIFO ({} frames).", device.GetRxFifoSize());
 		while(device.GetRxFifoSize() > 0)
 		{
 			device >> rxdlf;
-			Log->debug("Received new packet with last state confirmed and next image trunk");
+            Log->debug("RX: received new packet with last state confirmed and next image trunk (FS: {}).", rxdlf->GetFrameSize());
 		}
 		_UpdateLastConfirmedStateFromLastMsg();
 		_UpdateImgBufferFromLastMsg();
@@ -270,7 +274,7 @@ void ROVOperator::_WaitForCurrentStateAndNextImageTrunk(int timeout)
 	}
 	else
 	{
-		Log->warn("Timeout when trying to receive feedback from the ROV!");
+        Log->warn("RX: timeout when trying to receive feedback from the ROV!");
     }
 }
 
@@ -283,12 +287,12 @@ void ROVOperator::_UpdateImgBufferFromLastMsg()
 	{
 		if(trunkInfo & IMG_FIRST_TRUNK_FLAG) //the received trunk is the first trunk of an image
 		{
-			Log->debug("the received trunk is the first trunk of an image");
+            Log->debug("RX: the received trunk is the first trunk of an image");
 			memcpy(beginImgPtr, imgTrunkPtr, trunkSize);
 			currentImgPtr = beginImgPtr + trunkSize;
 			if(trunkInfo & IMG_LAST_TRUNK_FLAG) //the received trunk is also the last of an image (the image only has 1 trunk)
 			{
-				Log->debug("the received trunk is also the last of an image (the image only has 1 trunk)");
+                Log->debug("RX: the received trunk is also the last of an image (the image only has 1 trunk)");
 				_LastTrunkReceived(trunkSize);
 			}
 		}
@@ -300,21 +304,21 @@ void ROVOperator::_UpdateImgBufferFromLastMsg()
 				currentImgPtr += trunkSize;
 				if(trunkInfo & IMG_LAST_TRUNK_FLAG) //the received trunk is the last of an image
 				{
-					Log->debug("the received trunk is the last of an image");
+                    Log->debug("RX: the received trunk is the last of an image");
 					_LastTrunkReceived(trunkSize);
 				}
 			}
 			else
 			{
 			//else, we are waiting for the first trunk of an image
-				Log->debug("waiting for the first trunk of an image");
+                Log->debug("RX: waiting for the first trunk of an image");
 			}
 		}
 	}
 	else
 	{
 		//else, packet without an image trunk
-		Log->warn("packet received without an image trunk");
+        Log->warn("RX: packet received without an image trunk");
 	}
 
 
@@ -337,7 +341,7 @@ void ROVOperator::_LastTrunkReceived(uint16_t trunkSize)
 	}
 	else
 	{
-		Log->warn("image received with errors... (some packets were lost)");
+        Log->warn("RX: image received with errors... (some packets were lost)");
 	}
 }
 
@@ -371,16 +375,16 @@ void ROVOperator::_SendPacketWithDesiredState()
             txstatemutex.unlock();
 
             txdlf->PayloadUpdated(txStateLength);
-            Log->debug("Sending packet with new orders...");
+            Log->debug("TX: sending packet with new orders...");
             device << txdlf;
             while(device.BusyTransmitting());
         }
         else
-            Log->critical("Device busy transmitting after wating for the current rov state");
+            Log->critical("TX: device busy transmitting after wating for the current rov state");
     }
     else
     {
-        Log->warn("Desired state is not set yet");
+        Log->warn("TX: desired state is not set yet");
         Utils::Sleep(1000);
     }
 }

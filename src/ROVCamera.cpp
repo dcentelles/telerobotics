@@ -90,18 +90,21 @@ void ROVCamera::SetRemoteAddr(int _addr)
 void ROVCamera::SetMaxImageTrunkLength(int _len)
 {
 	maxImgTrunkLength = _len;
+    Log->debug("Set a new maximum image trunk length: {} bytes", _len);
 }
 
 void ROVCamera::SetTxStateSize(int _len)
 {
     txStateLength = _len;
     beginImgPtr = currentTxState + txStateLength;
+    Log->debug("Set a new Tx-State length: {} bytes", _len);
 }
 void ROVCamera::SetRxStateSize(int _len)
 {
     rxStateLength = _len;
     currentTxState = currentRxState + rxStateLength;
     SetTxStateSize(txStateLength);
+    Log->debug("Set a new Rx-State length: {} bytes", _len);
 }
 
 void ROVCamera::SetLogLevel(Loggable::LogLevel _level)
@@ -125,7 +128,7 @@ void ROVCamera::LogToConsole(bool c)
 void ROVCamera::LogToFile(const string &filename)
 {
     Loggable::LogToFile(filename);
-    device.LogToFile(filename);
+    device.LogToFile(filename + "_service");
 }
 
 void ROVCamera::FlushLog()
@@ -177,6 +180,7 @@ void ROVCamera::SendImage(void * _buf, unsigned int _length)
 
 
 	imgInBuffer = true;
+    Log->debug("New image available to transmit ({} bytes).", _length);
 
 	//mutex is unlocked automatically when calling the unique_lock destructor:
 	//http://www.cplusplus.com/reference/mutex/unique_lock/
@@ -253,7 +257,7 @@ void ROVCamera::_TxWork()
 
 void ROVCamera::_RxWork()
 {
-	Log->debug("waiting for new orders...");
+    Log->debug("RX: waiting for new orders...");
 	_WaitForNewOrders(10000);
 }
 
@@ -295,14 +299,14 @@ void ROVCamera::_WaitForNewOrders(int timeout)
 			while(device.GetRxFifoSize() > 0)
 			{
 				device >> rxdlf;
-				Log->debug("New orders received!");
+                Log->debug("RX: new orders received!");
 			}
             _UpdateCurrentRxStateFromRxState();
 			ordersReceivedCallback(*this);
 	}
 	else
 	{
-		Log->warn("Timeout when trying to receive new orders from the operator!");
+        Log->warn("RX: timeout when trying to receive new orders from the operator!");
     }
 }
 
@@ -313,7 +317,7 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
 	//unsigned long a0 = (unsigned long) currentImgPtr;
 	if(device.BusyTransmitting())
 	{
-		Log->critical("BUG: Device busy transmitting...");
+        Log->critical("TX: possible bug: device busy transmitting at init..");
 		return;
 	}
     if(txStateSet)
@@ -351,17 +355,19 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
             currentImgPtr += nextTrunkLength;
 
             txdlf->PayloadUpdated(txStateLength + imgTrunkInfoLength + nextTrunkLength);
+            Log->debug("TX: transmitting packet with the current state and an image trunk (FS: {})", txdlf->GetFrameSize());
         }
         else
         {
             *imgTrunkInfoPtr = 0;
             txdlf->PayloadUpdated(txStateLength + IMG_TRUNK_INFO_SIZE);
+            Log->debug("TX: transmitting packet without an image trunk (only the current state (FS: {})", txdlf->GetFrameSize());
         }
         device << txdlf;
     }
     else
     {
-        Log->warn("Current state is not set yet");
+        Log->warn("TX: current state is not set yet");
         Utils::Sleep(1000);
     }
 
@@ -377,6 +383,7 @@ void ROVCamera::_CheckIfEntireImgIsSent()
 		endImgPtr = currentImgPtr;
 		imgInBufferCond.notify_one();
 		lastImageSentCallback(*this);
+        Log->debug("TX: image transmission completed");
 	}
 }
 
