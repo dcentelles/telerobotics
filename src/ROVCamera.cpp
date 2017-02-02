@@ -305,7 +305,9 @@ void ROVCamera::_WaitForNewOrders(int timeout)
 			while(device.GetRxFifoSize() > 0)
 			{
 				device >> rxdlf;
-                Log->debug("RX: new orders received!");
+                Log->debug("RX: new orders received! (Seq: {}) (FS: {})",
+                           rxtrp->GetSeqNum (),
+                           rxdlf->GetFrameSize());
 			}
             _UpdateCurrentRxStateFromRxState();
 			ordersReceivedCallback(*this);
@@ -361,15 +363,20 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
             currentImgPtr += nextTrunkLength;
 
             txdlf->PayloadUpdated(TransportPDU::OverheadSize + txStateLength + imgTrunkInfoLength + nextTrunkLength);
-            Log->debug("TX: transmitting packet with the current state and an image trunk (FS: {})", txdlf->GetFrameSize());
+            Log->debug("TX: transmitting packet with the current state and an image trunk (Seq: {}) (FS: {})",
+                       txtrp->GetSeqNum (),
+                       txdlf->GetFrameSize());
         }
         else
         {
             *imgTrunkInfoPtr = 0;
             txdlf->PayloadUpdated(TransportPDU::OverheadSize + txStateLength + IMG_TRUNK_INFO_SIZE);
-            Log->debug("TX: transmitting packet without an image trunk (only the current state (FS: {})", txdlf->GetFrameSize());
+            Log->debug("TX: transmitting packet without an image trunk (only the current state (Seq: {}) (FS: {})",
+                       txtrp->GetSeqNum (),
+                       txdlf->GetFrameSize());
         }
         device << txdlf;
+        txtrp->IncSeqNum ();
     }
     else
     {

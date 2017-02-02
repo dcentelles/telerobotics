@@ -272,7 +272,9 @@ void ROVOperator::_WaitForCurrentStateAndNextImageTrunk(int timeout)
 		while(device.GetRxFifoSize() > 0)
 		{
 			device >> rxdlf;
-            Log->debug("RX: received new packet with last state confirmed and next image trunk (FS: {}).", rxdlf->GetFrameSize());
+            Log->debug("RX: received new packet with last state confirmed and next image trunk (Seq: {}) (FS: {})",
+                       rxtrp->GetSeqNum (),
+                       rxdlf->GetFrameSize());
 		}
 		_UpdateLastConfirmedStateFromLastMsg();
 		_UpdateImgBufferFromLastMsg();
@@ -381,8 +383,11 @@ void ROVOperator::_SendPacketWithDesiredState()
             txstatemutex.unlock();
 
             txdlf->PayloadUpdated(TransportPDU::OverheadSize+txStateLength);
-            Log->debug("TX: sending packet with new orders...");
+            Log->debug("TX: sending packet with new orders... (Seq: {}) (FS: {})",
+                       txtrp->GetSeqNum (),
+                       txdlf->GetFrameSize());
             device << txdlf;
+            txtrp->IncSeqNum ();
             while(device.BusyTransmitting());
         }
         else
