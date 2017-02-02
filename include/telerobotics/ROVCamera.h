@@ -12,6 +12,7 @@
 #include <functional>
 #include <dccomms/CommsDeviceService.h>
 #include <dccomms/DataLinkFrame.h>
+#include <dccomms/TransportPDU.h>
 #include <dccomms/Utils.h>
 #include <mutex>
 #include <condition_variable>
@@ -85,6 +86,9 @@ private:
 	CommsDeviceService device;
 	DataLinkFramePtr txdlf;
 	DataLinkFramePtr rxdlf;
+        TransportPDUPtr txtrp;
+        TransportPDUPtr rxtrp;
+
 	//for halfDuplex
 	ServiceThread<ROVCamera> service;
 

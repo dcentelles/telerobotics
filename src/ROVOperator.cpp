@@ -214,8 +214,14 @@ void ROVOperator::Start()
 	SetLocalAddr(localAddr);
 	SetRemoteAddr(remoteAddr);
 
-	txbuffer = txdlf->GetPayloadBuffer();
-	rxbuffer = rxdlf->GetPayloadBuffer();
+    auto txdlbuffer = txdlf->GetPayloadBuffer();
+    auto rxdlbuffer = rxdlf->GetPayloadBuffer();
+
+    txtrp = TransportPDU::BuildTransportPDU(0,txdlbuffer);
+    rxtrp = TransportPDU::BuildTransportPDU(0,rxdlbuffer);
+
+    txbuffer = txtrp->GetPayloadBuffer();
+    rxbuffer = rxtrp->GetPayloadBuffer();
 
 	txStatePtr = txbuffer;
 	rxStatePtr = rxbuffer;
@@ -374,7 +380,7 @@ void ROVOperator::_SendPacketWithDesiredState()
             memcpy(txStatePtr, desiredState, txStateLength);
             txstatemutex.unlock();
 
-            txdlf->PayloadUpdated(txStateLength);
+            txdlf->PayloadUpdated(TransportPDU::OverheadSize+txStateLength);
             Log->debug("TX: sending packet with new orders...");
             device << txdlf;
             while(device.BusyTransmitting());

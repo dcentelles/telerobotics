@@ -213,8 +213,14 @@ void ROVCamera::Start()
 	SetLocalAddr(localAddr);
 	SetRemoteAddr(remoteAddr);
 
-	txbuffer = txdlf->GetPayloadBuffer();
-	rxbuffer = rxdlf->GetPayloadBuffer();
+    auto txdlbuffer = txdlf->GetPayloadBuffer();
+    auto rxdlbuffer = rxdlf->GetPayloadBuffer();
+
+    txtrp = TransportPDU::BuildTransportPDU(0,txdlbuffer);
+    rxtrp = TransportPDU::BuildTransportPDU(0,rxdlbuffer);
+
+    txbuffer = txtrp->GetPayloadBuffer();
+    rxbuffer = rxtrp->GetPayloadBuffer();
 
 	txStatePtr = txbuffer;
     imgTrunkInfoPtr = (uint16_t*) (txStatePtr + txStateLength);
@@ -354,13 +360,13 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk()
             memcpy(imgTrunkPtr, currentImgPtr, nextTrunkLength);
             currentImgPtr += nextTrunkLength;
 
-            txdlf->PayloadUpdated(txStateLength + imgTrunkInfoLength + nextTrunkLength);
+            txdlf->PayloadUpdated(TransportPDU::OverheadSize + txStateLength + imgTrunkInfoLength + nextTrunkLength);
             Log->debug("TX: transmitting packet with the current state and an image trunk (FS: {})", txdlf->GetFrameSize());
         }
         else
         {
             *imgTrunkInfoPtr = 0;
-            txdlf->PayloadUpdated(txStateLength + IMG_TRUNK_INFO_SIZE);
+            txdlf->PayloadUpdated(TransportPDU::OverheadSize + txStateLength + IMG_TRUNK_INFO_SIZE);
             Log->debug("TX: transmitting packet without an image trunk (only the current state (FS: {})", txdlf->GetFrameSize());
         }
         device << txdlf;

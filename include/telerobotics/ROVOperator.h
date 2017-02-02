@@ -12,6 +12,8 @@
 #include <iostream>
 #include <dccomms/Utils.h>
 #include <dccomms/CommsDeviceService.h>
+#include <dccomms/TransportPDU.h>
+
 #include <mutex>
 #include <Loggable.h>
 #include <telerobotics/Constants.h>
@@ -71,11 +73,13 @@ private:
                 * desiredState,  // == currentTxState
                 * beginImgPtr,
                 * beginLastImgPtr;
-	uint16_t lastImgSize;
+        uint16_t lastImgSize;
 
 	CommsDeviceService device;
 	DataLinkFramePtr txdlf;
 	DataLinkFramePtr rxdlf;
+        TransportPDUPtr txtrp;
+        TransportPDUPtr rxtrp;
 
 	//for halfDuplex
 	ServiceThread<ROVOperator> service;
