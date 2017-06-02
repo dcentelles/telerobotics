@@ -124,6 +124,8 @@ private:
 
 	int localAddr, remoteAddr;
         bool txStateSet;
+
+        unsigned int _timeout, _minTimeout, _timeoutInc;
 };
 
 } /* namespace dcauv */

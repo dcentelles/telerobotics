@@ -68,6 +68,10 @@ ROVOperator::ROVOperator(LinkType _linkType):service(this),txservice(this),rxser
 	remoteAddr = 0;
 
     desiredStateSet = false;
+
+    _minTimeout = 3000;
+    _timeout = 3500;
+    _timeoutInc = 1000;
 }
 
 ROVOperator::~ROVOperator() {
@@ -244,7 +248,7 @@ void ROVOperator::Start()
 void ROVOperator::_Work()
 {
 	Log->debug("waiting for new state from ROV...");
-	_WaitForCurrentStateAndNextImageTrunk(10000);
+	_WaitForCurrentStateAndNextImageTrunk(_timeout);
 	device.WaitForDeviceReadyToTransmit();
 	_SendPacketWithDesiredState();
 }
@@ -259,7 +263,7 @@ void ROVOperator::_TxWork()
 void ROVOperator::_RxWork()
 {
     Log->debug("RX: waiting for new state from ROV...");
-	_WaitForCurrentStateAndNextImageTrunk(10000);
+    _WaitForCurrentStateAndNextImageTrunk(_timeout);
 }
 
 void ROVOperator::_WaitForCurrentStateAndNextImageTrunk(int timeout)

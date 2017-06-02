@@ -55,6 +55,9 @@ ROVCamera::ROVCamera(LinkType _linkType):service(this),txservice(this),rxservice
 	localAddr = 0;
 	remoteAddr = 0;
     txStateSet = false;
+    _minTimeout = 3000;
+    _timeout = 3500;
+    _timeoutInc = 1000;
 }
 
 ROVCamera::~ROVCamera() {
@@ -244,7 +247,7 @@ void ROVCamera::Start()
 void ROVCamera::_Work()
 {
 	Log->debug("waiting for new orders...");
-	_WaitForNewOrders(10000);
+	_WaitForNewOrders(_timeout);
 	immutex.lock();
 	_SendPacketWithCurrentStateAndImgTrunk();
 	_CheckIfEntireImgIsSent();
@@ -264,7 +267,7 @@ void ROVCamera::_TxWork()
 void ROVCamera::_RxWork()
 {
     Log->debug("RX: waiting for new orders...");
-	_WaitForNewOrders(10000);
+    _WaitForNewOrders(_timeout);
 }
 
 

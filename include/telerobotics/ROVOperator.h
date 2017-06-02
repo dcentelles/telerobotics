@@ -126,6 +126,8 @@ private:
 
 	int localAddr, remoteAddr;
         bool desiredStateSet;
+
+        unsigned int _timeout, _minTimeout, _timeoutInc;
 };
 
 } /* namespace dcauv */
