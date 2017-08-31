@@ -112,11 +112,13 @@ namespace dcauv {
   void ROVOperator::SetRxStateSize(int _len)
   {
     _UpdateRxStateSize(_len);
+    Log->debug("Set a new Rx-State length: {} bytes", _len);
   }
 
   void ROVOperator::SetTxStateSize(int _len)
   {
     _UpdateTxStateSize(_len);
+    Log->debug("Set a new Tx-State length: {} bytes", _len);
   }
 
   void ROVOperator::_UpdateRxStateSize(int _len)
@@ -125,7 +127,6 @@ namespace dcauv {
     desiredState = currentRxState + rxStateLength;
     beginImgPtr = desiredState + txStateLength;
     beginLastImgPtr = beginImgPtr + MAX_IMG_SIZE;
-    Log->debug("Set a new Rx-State length: {} bytes", _len);
   }
 
 
@@ -134,7 +135,6 @@ namespace dcauv {
     txStateLength = _len;
     beginImgPtr = desiredState + txStateLength;
     beginLastImgPtr = beginImgPtr + MAX_IMG_SIZE;
-    Log->debug("Set a new Tx-State length: {} bytes", _len);
   }
 
   void ROVOperator::SetLogLevel(Loggable::LogLevel _level)
