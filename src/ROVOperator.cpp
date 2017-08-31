@@ -70,7 +70,7 @@ namespace dcauv {
     desiredStateSet = false;
 
     _minTimeout = 3000;
-    _timeout = 3500;
+    _timeout = 5000;
     _timeoutInc = 1000;
   }
 
