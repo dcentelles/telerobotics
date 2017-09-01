@@ -110,7 +110,7 @@ namespace dcauv {
     Log->debug("Set a new Rx-State length: {} bytes", _len);
   }
 
-  void ROVCamera::SetLogLevel(Loggable::LogLevel _level)
+  void ROVCamera::SetLogLevel(cpplogging::LogLevel _level)
   {
     Loggable::SetLogLevel(_level);
     device.SetLogLevel(_level);

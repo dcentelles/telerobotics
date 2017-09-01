@@ -137,7 +137,7 @@ namespace dcauv {
     beginLastImgPtr = beginImgPtr + MAX_IMG_SIZE;
   }
 
-  void ROVOperator::SetLogLevel(Loggable::LogLevel _level)
+  void ROVOperator::SetLogLevel(cpplogging::LogLevel _level)
   {
     Loggable::SetLogLevel(_level);
     device.SetLogLevel(_level);

@@ -15,7 +15,7 @@
 #include <dccomms/TransportPDU.h>
 
 #include <mutex>
-#include <Loggable.h>
+#include <cpplogging/Loggable.h>
 #include <telerobotics/Constants.h>
 
 namespace dcauv {
@@ -49,7 +49,7 @@ namespace dcauv {
 
     void Start();
 
-    virtual void SetLogLevel(Loggable::LogLevel);
+    virtual void SetLogLevel(cpplogging::LogLevel);
     virtual void SetLogName(string name);
     virtual void FlushLog();
     virtual void FlushLogOn(LogLevel);

@@ -16,7 +16,7 @@
 #include <dccomms/Utils.h>
 #include <mutex>
 #include <condition_variable>
-#include <Loggable.h>
+#include <cpplogging/Loggable.h>
 #include <telerobotics/Constants.h>
 
 namespace dcauv {
@@ -47,7 +47,7 @@ namespace dcauv {
     void SetChecksumType(DataLinkFrame::fcsType fcs);
     void Start();
 
-    virtual void SetLogLevel(Loggable::LogLevel);
+    virtual void SetLogLevel(cpplogging::LogLevel);
     virtual void SetLogName(string name);
     virtual void FlushLog();
     virtual void FlushLogOn(LogLevel);
