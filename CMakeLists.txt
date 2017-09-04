@@ -1,6 +1,4 @@
 cmake_minimum_required (VERSION 3.5.1)
-project (telerobotics CXX)
-
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_COLOR_MAKEFILE   ON)
@@ -9,19 +7,48 @@ set(CMAKE_COLOR_MAKEFILE   ON)
 if (WIN32)
   set(CMAKE_SHARED_LIBRARY_PREFIX "")
 endif ()
- 
+
+SET(PROJECT_NAME_ORIG telerobotics)
+message("Building ${PROJECT_NAME_ORIG}...")
+
+#BEGIN RESOLVE GIT REVISION
+#https://bravenewmethod.com/2017/07/14/git-revision-as-compiler-definition-in-build-with-cmake/
+message(STATUS "Resolving GIT Version...")
+set(_build_version "unknown")
+find_package(Git)
+if(GIT_FOUND)
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    OUTPUT_VARIABLE _build_version
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  message( STATUS "GIT hash: ${_build_version}")
+else()
+  message(STATUS "GIT not found")
+endif()
+string(TIMESTAMP _time_stamp)
+#END RESOLVE GIT REVISION
+
+SET(PROJECT_NAME_GIT "${PROJECT_NAME_ORIG}_${_build_version}")
+string(TOUPPER ${PROJECT_NAME_ORIG} TMP0)
+SET(${TMP0}_GIT "${PROJECT_NAME_GIT}" PARENT_SCOPE)
+
+if (TARGET ${PROJECT_NAME_GIT})
+    message(WARNING "${PROJECT_NAME_GIT} has already been built!")
+    return()
+endif()
+
+project (${PROJECT_NAME_GIT} CXX)
+message(STATUS "PROJECT NAME: ${PROJECT_NAME}")
 ####### LOAD DEPENDENCIES ######
 
 SET(${PROJECT_NAME}_DEPS_DIR "deps/")
 
-if (NOT TARGET dccomms)
-	add_subdirectory(${${PROJECT_NAME}_DEPS_DIR}/dccomms)
-endif()
-
-if (NOT TARGET cpplogging)
-	add_subdirectory(${${PROJECT_NAME}_DEPS_DIR}/cpplogging)
-endif()
-
+add_subdirectory(${${PROJECT_NAME}_DEPS_DIR}/dccomms)
+#add_subdirectory(${${PROJECT_NAME}_DEPS_DIR}/cpplogging)
+message(STATUS "Dccomms name: ${DCCOMMS_GIT}")
 ###### 
 
 SET(${PROJECT_NAME}_INCLUDE_DIRS "include")
@@ -31,7 +58,9 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${${PROJECT_NAME}_CXX_COMPILE_FLAGS}")
 
 add_library(${PROJECT_NAME} SHARED ${${PROJECT_NAME}_CPP_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${${PROJECT_NAME}_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} dccomms cpplogging)
+target_link_libraries(${PROJECT_NAME} ${DCCOMMS_GIT} ${CPPLOGGING_GIT})
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION "lib")
 install(DIRECTORY "include/telerobotics" DESTINATION "include")
+
+message("End ${PROJECT_NAME_ORIG}")
