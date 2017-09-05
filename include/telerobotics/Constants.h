@@ -8,7 +8,6 @@
 #ifndef CONSTANTS_H_
 #define CONSTANTS_H_
 
-
 namespace dcauv {
 
 #define IMG_TRUNK_INFO_SIZE 2
@@ -20,7 +19,7 @@ namespace dcauv {
 #define MAX_PACKET_LENGTH 2048
 #define IMG_CHKSUM_SIZE 4
 
-  enum LinkType {fullDuplex, halfDuplex};
+enum LinkType { fullDuplex, halfDuplex };
 }
 
 #endif /* CONSTANTS_H_ */

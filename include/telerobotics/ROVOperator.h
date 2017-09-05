@@ -8,127 +8,125 @@
 #ifndef ROVOPERATOR_H_
 #define ROVOPERATOR_H_
 
-#include <functional>
-#include <iostream>
-#include <dccomms/Utils.h>
 #include <dccomms/CommsDeviceService.h>
 #include <dccomms/TransportPDU.h>
+#include <dccomms/Utils.h>
+#include <functional>
+#include <iostream>
 
-#include <mutex>
 #include <cpplogging/Loggable.h>
+#include <mutex>
 #include <telerobotics/Constants.h>
 
 namespace dcauv {
 
-  using namespace dccomms;
-  using namespace cpplogging;
+using namespace dccomms;
+using namespace cpplogging;
 
-  class ROVOperator: public Loggable {
-  public:
-    ROVOperator(LinkType = halfDuplex);
-    virtual ~ROVOperator();
-    void SetDesiredState(const void * data);
+class ROVOperator : public Loggable {
+public:
+  ROVOperator(LinkType = halfDuplex);
+  virtual ~ROVOperator();
+  void SetDesiredState(const void *data);
 
-    //http://stackoverflow.com/questions/2298242/callback-functions-in-c
-    /*
-        //mode 1:
-        typedef void (*f_data)(void*,unsigned int);
-        void SetDataReceivedCallback(f_data);
-        */
-    //mode 2:
-    typedef std::function<void(ROVOperator &)> f_notification;
+  // http://stackoverflow.com/questions/2298242/callback-functions-in-c
+  /*
+      //mode 1:
+      typedef void (*f_data)(void*,unsigned int);
+      void SetDataReceivedCallback(f_data);
+      */
+  // mode 2:
+  typedef std::function<void(ROVOperator &)> f_notification;
 
-    void SetImageReceivedCallback(f_notification);
-    void SetStateReceivedCallback(f_notification);
+  void SetImageReceivedCallback(f_notification);
+  void SetStateReceivedCallback(f_notification);
 
-    int GetLastReceivedImage(void *);
-    void GetLastConfirmedState(void *);
+  int GetLastReceivedImage(void *);
+  void GetLastConfirmedState(void *);
 
-    void SetLocalAddr(int);
-    void SetRemoteAddr(int);
+  void SetLocalAddr(int);
+  void SetRemoteAddr(int);
 
-    void Start();
+  void Start();
 
-    virtual void SetLogLevel(cpplogging::LogLevel);
-    virtual void SetLogName(string name);
-    virtual void FlushLog();
-    virtual void FlushLogOn(LogLevel);
-    virtual void LogToConsole(bool);
-    virtual void LogToFile(const string &filename);
+  virtual void SetLogLevel(cpplogging::LogLevel);
+  virtual void SetLogName(string name);
+  virtual void FlushLog();
+  virtual void FlushLogOn(LogLevel);
+  virtual void LogToConsole(bool);
+  virtual void LogToFile(const string &filename);
 
-    void SetMaxImageTrunkLength(int);
-    void SetRxStateSize(int);
-    void SetTxStateSize(int);
-  private:
-    void _UpdateRxStateSize(int);
-    void _UpdateTxStateSize(int);
+  void SetMaxImageTrunkLength(int);
+  void SetRxStateSize(int);
+  void SetTxStateSize(int);
 
-    f_notification imageReceivedCallback;
-    f_notification stateReceivedCallback;
+private:
+  void _UpdateRxStateSize(int);
+  void _UpdateTxStateSize(int);
 
-    LinkType linkType;
-    std::mutex immutex, txstatemutex, rxstatemutex;
-    uint8_t * buffer;
-    uint8_t * currentRxState,
-    * desiredState,  // == currentTxState
-    * beginImgPtr,
-    * beginLastImgPtr;
-    uint16_t lastImgSize;
+  f_notification imageReceivedCallback;
+  f_notification stateReceivedCallback;
 
-    CommsDeviceService device;
-    DataLinkFramePtr txdlf;
-    DataLinkFramePtr rxdlf;
-    TransportPDUPtr txtrp;
-    TransportPDUPtr rxtrp;
+  LinkType linkType;
+  std::mutex immutex, txstatemutex, rxstatemutex;
+  uint8_t *buffer;
+  uint8_t *currentRxState,
+      *desiredState, // == currentTxState
+      *beginImgPtr, *beginLastImgPtr;
+  uint16_t lastImgSize;
 
-    //for halfDuplex
-    ServiceThread<ROVOperator> service;
+  CommsDeviceService device;
+  DataLinkFramePtr txdlf;
+  DataLinkFramePtr rxdlf;
+  TransportPDUPtr txtrp;
+  TransportPDUPtr rxtrp;
 
-    //for fullDuplex
-    ServiceThread<ROVOperator> txservice;
-    ServiceThread<ROVOperator> rxservice;
+  // for halfDuplex
+  ServiceThread<ROVOperator> service;
 
-    DataLinkFrame::fcsType dlfcrctype;
+  // for fullDuplex
+  ServiceThread<ROVOperator> txservice;
+  ServiceThread<ROVOperator> rxservice;
 
-    ///// TX ////
-    uint8_t * txStatePtr, * txbuffer;
+  DataLinkFrame::fcsType dlfcrctype;
 
-    ///// RX ////
-    uint8_t * rxStatePtr,     *imgTrunkPtr,  *rxbuffer,
-    * currentImgPtr;
+  ///// TX ////
+  uint8_t *txStatePtr, *txbuffer;
 
-    uint16_t * imgTrunkInfoPtr;
+  ///// RX ////
+  uint8_t *rxStatePtr, *imgTrunkPtr, *rxbuffer, *currentImgPtr;
 
-    int rxStateLength,
-    txStateLength;
-    int imgTrunkInfoLength;
-    int maxImgTrunkLength;
-    int maxPacketLength;
-    //int minPacketLength;
+  uint16_t *imgTrunkInfoPtr;
 
-    bool imgInBuffer;
-    bool bigEndian;
-    Timer rxtimer;
+  int rxStateLength, txStateLength;
+  int imgTrunkInfoLength;
+  int maxImgTrunkLength;
+  int maxPacketLength;
+  // int minPacketLength;
 
-    void _WaitForCurrentStateAndNextImageTrunk(int millis_timeout);
-    void _UpdateImgBufferFromLastMsg();
-    void _SendPacketWithDesiredState();
-    void _UpdateLastConfirmedStateFromLastMsg();
+  bool imgInBuffer;
+  bool bigEndian;
+  Timer rxtimer;
 
-    void _Work(); //for half duplex
+  void _WaitForCurrentStateAndNextImageTrunk(int millis_timeout);
+  void _UpdateImgBufferFromLastMsg();
+  void _SendPacketWithDesiredState();
+  void _UpdateLastConfirmedStateFromLastMsg();
 
-    void _RxWork(); //for full duplex
-    void _TxWork(); //for full duplex
+  void _Work(); // for half duplex
 
-    uint16_t _GetTrunkInfo();
-    uint16_t _GetTrunkSize(uint16_t rawInfo);
-    void _LastTrunkReceived(uint16_t trunkSize);
+  void _RxWork(); // for full duplex
+  void _TxWork(); // for full duplex
 
-    int localAddr, remoteAddr;
-    bool desiredStateSet;
+  uint16_t _GetTrunkInfo();
+  uint16_t _GetTrunkSize(uint16_t rawInfo);
+  void _LastTrunkReceived(uint16_t trunkSize);
 
-    unsigned int _timeout, _minTimeout, _timeoutInc;
-  };
+  int localAddr, remoteAddr;
+  bool desiredStateSet;
+
+  unsigned int _timeout, _minTimeout, _timeoutInc;
+};
 
 } /* namespace dcauv */
 
