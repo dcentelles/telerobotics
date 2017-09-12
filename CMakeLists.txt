@@ -52,8 +52,13 @@ message(STATUS "Dccomms name: ${DCCOMMS_GIT}")
 ###### 
 
 SET(${PROJECT_NAME}_INCLUDE_DIRS "include")
-file(GLOB ${PROJECT_NAME}_CPP_FILES "src/*.cpp") 
-SET(${PROJECT_NAME}_CXX_COMPILE_FLAGS "-fPIC -std=c++0x")
+SET(${PROJECT_NAME}_CPP_FILES
+                        src/ROVCamera.cpp
+                        src/ROVOperator.cpp
+                        src/StateSender.cpp
+                        src/StateReceiver.cpp
+                        )
+SET(${PROJECT_NAME}_CXX_COMPILE_FLAGS "-fPIC -std=c++14")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${${PROJECT_NAME}_CXX_COMPILE_FLAGS}")
 
 add_library(${PROJECT_NAME} SHARED ${${PROJECT_NAME}_CPP_FILES})
