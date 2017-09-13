@@ -2,9 +2,9 @@
 #define STATESENDER_H
 
 #include <cpplogging/cpplogging.h>
+#include <dccomms/CommsDeviceService.h>
 #include <dccomms/DataLinkFrame.h>
 #include <dccomms/TransportPDU.h>
-#include <dccomms/CommsDeviceService.h>
 #include <dccomms/Utils.h>
 #include <mutex>
 
@@ -13,8 +13,7 @@ namespace dcauv {
 using namespace dccomms;
 using namespace cpplogging;
 
-class StateSender : public Logger
-{
+class StateSender : public Logger {
 public:
   StateSender();
   ~StateSender();
@@ -45,7 +44,7 @@ private:
   ServiceThread<StateSender> _txService;
   uint8_t _localAddr, _remoteAddr;
   CommsDeviceService _device;
-  uint8_t * _stateBuffer;
+  uint8_t *_txStatePtr;
   uint16_t _stateSize;
   DataLinkFrame::fcsType _fcsType;
   int _txRate;
@@ -53,8 +52,6 @@ private:
   int _maxPacketLength;
   void _Work();
   void _SendPacket();
-
-
 };
 }
 #endif // STATESENDER_H

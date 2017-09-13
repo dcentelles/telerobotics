@@ -191,8 +191,8 @@ void ROVOperator::Start() {
   auto txdlbuffer = txdlf->GetPayloadBuffer();
   auto rxdlbuffer = rxdlf->GetPayloadBuffer();
 
-  txtrp = TransportPDU::BuildTransportPDU(0, txdlbuffer);
-  rxtrp = TransportPDU::BuildTransportPDU(0, rxdlbuffer);
+  txtrp = TransportPDU::BuildTransportPDU(txdlbuffer);
+  rxtrp = TransportPDU::BuildTransportPDU(rxdlbuffer);
 
   txbuffer = txtrp->GetPayloadBuffer();
   rxbuffer = rxtrp->GetPayloadBuffer();

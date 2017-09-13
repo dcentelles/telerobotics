@@ -17,8 +17,8 @@ StateSender::StateSender() : _txService(this) {
 
   _dlf = DataLinkFrame::BuildDataLinkFrame(_fcsType);
   auto dlfbuffer = _dlf->GetPayloadBuffer();
-  _trp = TransportPDU::BuildTransportPDU(0, dlfbuffer);
-  _stateBuffer = _trp->GetPayloadBuffer();
+  _trp = TransportPDU::BuildTransportPDU(dlfbuffer);
+  _txStatePtr = _trp->GetPayloadBuffer();
   _stateSize = 0;
 
   SetLocalAddr(1);
@@ -33,7 +33,7 @@ void StateSender::Start() {
 void StateSender::SetState(int size, const void *data) {
   _stateMutex.lock();
   _stateSize = size;
-  memcpy(_stateBuffer, data, _stateSize);
+  memcpy(_txStatePtr, data, _stateSize);
   _stateMutex.unlock();
 }
 
