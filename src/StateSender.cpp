@@ -49,8 +49,7 @@ void StateSender::_SendPacket() {
       _stateMutex.unlock();
       _trp->IncSeqNum();
 
-      while (_device.BusyTransmitting())
-        ;
+      _device.WaitForDeviceReadyToTransmit();
     } else
       Log->warn("TX: device busy transmitting");
   } else {
