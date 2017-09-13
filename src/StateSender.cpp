@@ -18,6 +18,7 @@ StateSender::StateSender() : _txService(this) {
   _dlf = DataLinkFrame::BuildDataLinkFrame(_fcsType);
   auto dlfbuffer = _dlf->GetPayloadBuffer();
   _trp = TransportPDU::BuildTransportPDU(dlfbuffer);
+  _trp->SetSeqNum(0);
   _txStatePtr = _trp->GetPayloadBuffer();
   _stateSize = 0;
 
