@@ -6,6 +6,8 @@
  */
 
 #include <dccomms/Checksum.h>
+#include <dccomms/dccomms.h>
+
 #include <telerobotics/Constants.h>
 #include <telerobotics/ROVCamera.h>
 
@@ -19,8 +21,11 @@ void defaultOrdersReceivedCallback(ROVCamera &rovcamera) {
   // Nothing to do
 }
 
+static PacketBuilderPtr pb =
+    CreateObject<DataLinkFramePacketBuilder>(DataLinkFrame::fcsType::crc16);
+
 ROVCamera::ROVCamera(LinkType _linkType)
-    : service(this), txservice(this), rxservice(this) {
+    : service(this), txservice(this), rxservice(this), device(pb) {
   // TODO Auto-generated constructor stub
   _SetEndianess();
   rxStateLength = MAX_IMG_STATE_LENGTH;
@@ -30,7 +35,7 @@ ROVCamera::ROVCamera(LinkType _linkType)
   maxPacketLength = MAX_PACKET_LENGTH;
 
   dlfcrctype = DataLinkFrame::fcsType::crc16;
-  device.SetNamespace("camera");
+  device.SetCommsDeviceId("camera");
   buffer = new uint8_t[maxPacketLength + MAX_IMG_STATE_LENGTH * 2 +
                        MAX_IMG_SIZE]; // buffer max size is orientative...
   currentRxState = buffer;
@@ -39,7 +44,6 @@ ROVCamera::ROVCamera(LinkType _linkType)
   imgInBuffer = false;
   lastImageSentCallback = &defaultLastImageSentCallback;
   ordersReceivedCallback = &defaultOrdersReceivedCallback;
-  device.SetChecksumType(DataLinkFrame::crc16);
 
   linkType = _linkType;
   if (linkType == halfDuplex)
@@ -192,9 +196,11 @@ void ROVCamera::Start() {
   auto txdlbuffer = txdlf->GetPayloadBuffer();
   auto rxdlbuffer = rxdlf->GetPayloadBuffer();
 
-  txtrp = TransportPDU::BuildTransportPDU(txdlbuffer);
+  txtrp = TransportPDU::BuildTransportPDU();
+  txtrp->SetBuffer(txdlbuffer);
   txtrp->SetSeqNum(0);
-  rxtrp = TransportPDU::BuildTransportPDU(rxdlbuffer);
+  rxtrp = TransportPDU::BuildTransportPDU();
+  txtrp->SetBuffer(rxdlbuffer);
 
   txbuffer = txtrp->GetPayloadBuffer();
   rxbuffer = rxtrp->GetPayloadBuffer();

@@ -9,6 +9,7 @@
 #define ROVOPERATOR_H_
 
 #include <dccomms/CommsDeviceService.h>
+#include <dccomms/DataLinkFrame.h>
 #include <dccomms/TransportPDU.h>
 #include <dccomms/Utils.h>
 #include <functional>
@@ -22,6 +23,7 @@ namespace dcauv {
 
 using namespace dccomms;
 using namespace cpplogging;
+using namespace std;
 
 class ROVOperator : public Loggable {
 public:

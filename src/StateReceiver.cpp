@@ -5,19 +5,22 @@ namespace dcauv {
 
 void defaultStateReceivedCallback(StateReceiver &stateReceiver) {}
 
-StateReceiver::StateReceiver() : _rxService(this) {
+static PacketBuilderPtr pb =
+    CreateObject<DataLinkFramePacketBuilder>(DataLinkFrame::fcsType::crc16);
+
+StateReceiver::StateReceiver() : _rxService(this), _device(pb) {
   _maxPacketLength = MAX_PACKET_LENGTH;
   _rxService.SetWork(&StateReceiver::_Work);
   _stateReceivedCallback = &defaultStateReceivedCallback;
   SetLogName("StateReceiver");
 
-  _device.SetNamespace("rov");
+  _device.SetCommsDeviceId("rov");
   _fcsType = DataLinkFrame::crc16;
-  _device.SetChecksumType(_fcsType);
 
   _dlf = DataLinkFrame::BuildDataLinkFrame(_fcsType);
   auto dlfbuffer = _dlf->GetPayloadBuffer();
-  _trp = TransportPDU::BuildTransportPDU(dlfbuffer);
+  _trp = TransportPDU::BuildTransportPDU();
+  _trp->SetBuffer(dlfbuffer);
   _rxStatePtr = _trp->GetPayloadBuffer();
   _stateSize = 0;
 

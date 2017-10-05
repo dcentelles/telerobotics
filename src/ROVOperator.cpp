@@ -18,8 +18,11 @@ void defaultImageReceivedCallback(ROVOperator &rovOperator) {}
 
 void defaultStateReceivedCallback(ROVOperator &rovOperator) {}
 
+static PacketBuilderPtr pb =
+    CreateObject<DataLinkFramePacketBuilder>(DataLinkFrame::fcsType::crc16);
+
 ROVOperator::ROVOperator(LinkType _linkType)
-    : service(this), txservice(this), rxservice(this) {
+    : service(this), txservice(this), rxservice(this), device(pb) {
   rxbuffer = 0;
   imgTrunkPtr = 0;
   txbuffer = 0;
@@ -41,8 +44,7 @@ ROVOperator::ROVOperator(LinkType _linkType)
   _UpdateRxStateSize(MAX_IMG_STATE_LENGTH);
   _UpdateTxStateSize(MAX_IMG_STATE_LENGTH);
 
-  device.SetNamespace("operator");
-  device.SetChecksumType(DataLinkFrame::crc16);
+  device.SetCommsDeviceId("operator");
   lastImgSize = 0;
   imgInBuffer = false;
   linkType = _linkType;
@@ -191,9 +193,11 @@ void ROVOperator::Start() {
   auto txdlbuffer = txdlf->GetPayloadBuffer();
   auto rxdlbuffer = rxdlf->GetPayloadBuffer();
 
-  txtrp = TransportPDU::BuildTransportPDU(txdlbuffer);
+  txtrp = TransportPDU::BuildTransportPDU();
+  txtrp->SetBuffer(txdlbuffer);
   txtrp->SetSeqNum(0);
-  rxtrp = TransportPDU::BuildTransportPDU(rxdlbuffer);
+  rxtrp = TransportPDU::BuildTransportPDU();
+  txtrp->SetBuffer(rxdlbuffer);
 
   txbuffer = txtrp->GetPayloadBuffer();
   rxbuffer = rxtrp->GetPayloadBuffer();

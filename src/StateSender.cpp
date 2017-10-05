@@ -5,19 +5,22 @@ namespace dcauv {
 
 void defaultStateTransmittedCallback(StateSender &stateSender) {}
 
-StateSender::StateSender() : _txService(this) {
+static PacketBuilderPtr pb =
+    CreateObject<DataLinkFramePacketBuilder>(DataLinkFrame::fcsType::crc16);
+
+StateSender::StateSender() : _txService(this), _device(pb) {
   _maxPacketLength = MAX_PACKET_LENGTH;
   _txService.SetWork(&StateSender::_Work);
   _stateTransmittedCallback = &defaultStateTransmittedCallback;
   SetLogName("StateSender");
 
-  _device.SetNamespace("operator");
+  _device.SetCommsDeviceId("operator");
   _fcsType = DataLinkFrame::crc16;
-  _device.SetChecksumType(_fcsType);
 
   _dlf = DataLinkFrame::BuildDataLinkFrame(_fcsType);
   auto dlfbuffer = _dlf->GetPayloadBuffer();
-  _trp = TransportPDU::BuildTransportPDU(dlfbuffer);
+  _trp = TransportPDU::BuildTransportPDU();
+  _trp->SetBuffer(dlfbuffer);
   _trp->SetSeqNum(0);
   _txStatePtr = _trp->GetPayloadBuffer();
   _stateSize = 0;
