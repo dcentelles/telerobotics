@@ -51,7 +51,10 @@ add_subdirectory(${${PROJECT_NAME}_DEPS_DIR}/dccomms)
 message(STATUS "Dccomms name: ${DCCOMMS_GIT}")
 ###### 
 
-SET(${PROJECT_NAME}_INCLUDE_DIRS "include")
+SET(${PROJECT_NAME}_INCLUDE_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${${DCCOMMS_GIT}_INCLUDE_DIRS}
+    )
 SET(${PROJECT_NAME}_CPP_FILES
                         src/ROVCamera.cpp
                         src/ROVOperator.cpp
@@ -63,9 +66,12 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${${PROJECT_NAME}_CXX_COMPILE_FLAGS}")
 
 add_library(${PROJECT_NAME} SHARED ${${PROJECT_NAME}_CPP_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${${PROJECT_NAME}_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} ${DCCOMMS_GIT} ${CPPLOGGING_GIT})
+target_link_libraries(${PROJECT_NAME} ${DCCOMMS_GIT})
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION "lib")
 install(DIRECTORY "include/telerobotics" DESTINATION "include")
+
+SET(${PROJECT_NAME}_INCLUDE_DIRS ${${PROJECT_NAME}_INCLUDE_DIRS} PARENT_SCOPE)
+SET(${PROJECT_NAME}_LIBRARIES ${PROJECT_NAME} ${${DCCOMMS_GIT}_LIBRARIES} PARENT_SCOPE)
 
 message("End ${PROJECT_NAME_ORIG}")
