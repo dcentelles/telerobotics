@@ -5,17 +5,14 @@
  *      Author: diego
  */
 
-#ifndef ROVOPERATOR_H_
-#define ROVOPERATOR_H_
-
-#include <dccomms/CommsDeviceService.h>
-#include <dccomms/DataLinkFrame.h>
-#include <dccomms/TransportPDU.h>
-#include <dccomms/Utils.h>
-#include <functional>
-#include <iostream>
+#ifndef WIRELESS_ARDUSUB_OPERATOR_H_
+#define WIRELESS_ARDUSUB_OPERATOR_H_
 
 #include <cpplogging/Loggable.h>
+#include <dccomms/Utils.h>
+#include <dccomms_packets/SimplePacket.h>
+#include <functional>
+#include <iostream>
 #include <mutex>
 #include <telerobotics/Constants.h>
 
@@ -24,12 +21,17 @@ namespace telerobotics {
 using namespace dccomms;
 using namespace cpplogging;
 using namespace std;
+using namespace dccomms_packets;
 
-class ROVOperator : public Loggable {
+class Operator : public Loggable {
 public:
-  ROVOperator(LinkType = halfDuplex);
-  virtual ~ROVOperator();
+  Operator();
+  virtual ~Operator();
   void SetDesiredState(const void *data);
+  void SetComms(Ptr<CommsDevice> comms);
+
+  uint32_t GetRxPacketSize();
+  uint32_t GetTxPacketSize();
 
   // http://stackoverflow.com/questions/2298242/callback-functions-in-c
   /*
@@ -38,7 +40,7 @@ public:
       void SetDataReceivedCallback(f_data);
       */
   // mode 2:
-  typedef std::function<void(ROVOperator &)> f_notification;
+  typedef std::function<void(Operator &)> f_notification;
 
   void SetImageReceivedCallback(f_notification);
   void SetStateReceivedCallback(f_notification);
@@ -46,30 +48,23 @@ public:
   int GetLastReceivedImage(void *);
   void GetLastConfirmedState(void *);
 
-  void SetLocalAddr(int);
-  void SetRemoteAddr(int);
-
   void Start();
 
-  virtual void SetLogLevel(cpplogging::LogLevel);
-  virtual void SetLogName(string name);
-  virtual void FlushLog();
-  virtual void FlushLogOn(LogLevel);
-  virtual void LogToConsole(bool);
-  virtual void LogToFile(const string &filename);
-
+  int GetImageSizeFromNumberOfPackets(int npackets);
   void SetMaxImageTrunkLength(int);
   void SetRxStateSize(int);
   void SetTxStateSize(int);
+  void DisableTransmission();
+  void EnableTransmission();
 
 private:
   void _UpdateRxStateSize(int);
   void _UpdateTxStateSize(int);
 
+  bool _canTransmit;
   f_notification imageReceivedCallback;
   f_notification stateReceivedCallback;
 
-  LinkType linkType;
   std::mutex immutex, txstatemutex, rxstatemutex;
   uint8_t *buffer;
   uint8_t *currentRxState,
@@ -77,20 +72,14 @@ private:
       *beginImgPtr, *beginLastImgPtr;
   uint16_t lastImgSize;
 
-  CommsDeviceService device;
-  DataLinkFramePtr txdlf;
-  DataLinkFramePtr rxdlf;
-  TransportPDUPtr txtrp;
-  TransportPDUPtr rxtrp;
+  Ptr<CommsDevice> _comms;
+  Ptr<SimplePacket> txdlf;
+  Ptr<SimplePacket> rxdlf;
 
-  // for halfDuplex
-  ServiceThread<ROVOperator> service;
+  ServiceThread<Operator> txservice;
+  ServiceThread<Operator> rxservice;
 
-  // for fullDuplex
-  ServiceThread<ROVOperator> txservice;
-  ServiceThread<ROVOperator> rxservice;
-
-  DataLinkFrame::fcsType dlfcrctype;
+  FCS dlfcrctype;
 
   ///// TX ////
   uint8_t *txStatePtr, *txbuffer;
@@ -124,10 +113,7 @@ private:
   uint16_t _GetTrunkSize(uint16_t rawInfo);
   void _LastTrunkReceived(uint16_t trunkSize);
 
-  int localAddr, remoteAddr;
   bool desiredStateSet;
-
-  unsigned int _timeout, _minTimeout, _timeoutInc;
 };
 
 } /* namespace dcauv */

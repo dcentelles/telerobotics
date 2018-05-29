@@ -8,7 +8,7 @@
 #include <dccomms/Utils.h>
 #include <mutex>
 
-namespace dcauv {
+namespace telerobotics {
 
 using namespace dccomms;
 using namespace cpplogging;

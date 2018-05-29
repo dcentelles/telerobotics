@@ -1,7 +1,7 @@
 #include <telerobotics/Constants.h>
 #include <telerobotics/StateReceiver.h>
 
-namespace dcauv {
+namespace telerobotics {
 
 void defaultStateReceivedCallback(StateReceiver &stateReceiver) {}
 

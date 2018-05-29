@@ -19,7 +19,7 @@
 #include <mutex>
 #include <telerobotics/Constants.h>
 
-namespace dcauv {
+namespace telerobotics {
 
 using namespace dccomms;
 using namespace cpplogging;

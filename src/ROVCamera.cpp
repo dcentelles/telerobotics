@@ -11,7 +11,7 @@
 #include <telerobotics/Constants.h>
 #include <telerobotics/ROVCamera.h>
 
-namespace dcauv {
+namespace telerobotics {
 
 void defaultLastImageSentCallback(ROVCamera &rovcamera) {
   // Nothing to do
@@ -28,15 +28,15 @@ ROVCamera::ROVCamera(LinkType _linkType)
     : service(this), txservice(this), rxservice(this), device(pb) {
   // TODO Auto-generated constructor stub
   _SetEndianess();
-  rxStateLength = MAX_IMG_STATE_LENGTH;
-  txStateLength = MAX_IMG_STATE_LENGTH;
+  rxStateLength = MAX_NODE_STATE_LENGTH;
+  txStateLength = MAX_NODE_STATE_LENGTH;
   imgTrunkInfoLength = IMG_TRUNK_INFO_SIZE;
   maxImgTrunkLength = MAX_IMG_TRUNK_LENGTH;
   maxPacketLength = MAX_PACKET_LENGTH;
 
   dlfcrctype = DataLinkFrame::fcsType::crc16;
   device.SetCommsDeviceId("camera");
-  buffer = new uint8_t[maxPacketLength + MAX_IMG_STATE_LENGTH * 2 +
+  buffer = new uint8_t[maxPacketLength + MAX_NODE_STATE_LENGTH * 2 +
                        MAX_IMG_SIZE]; // buffer max size is orientative...
   currentRxState = buffer;
   currentTxState = currentRxState + rxStateLength;

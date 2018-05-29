@@ -85,7 +85,7 @@ else()
   message(STATUS "GIT not found")
 endif()
 ENDFOREACH()
-###### 
+######
 
 SET(${PROJECT_NAME}_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -97,6 +97,8 @@ SET(${PROJECT_NAME}_CPP_FILES
                         src/ROVOperator.cpp
                         src/StateSender.cpp
                         src/StateReceiver.cpp
+                        src/Operator.cpp
+                        src/ROV.cpp
                         )
 SET(${PROJECT_NAME}_CXX_COMPILE_FLAGS "-fPIC -std=c++14")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${${PROJECT_NAME}_CXX_COMPILE_FLAGS}")

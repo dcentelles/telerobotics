@@ -1,7 +1,7 @@
 #include <telerobotics/Constants.h>
 #include <telerobotics/StateSender.h>
 
-namespace dcauv {
+namespace telerobotics {
 
 void defaultStateTransmittedCallback(StateSender &stateSender) {}
 
