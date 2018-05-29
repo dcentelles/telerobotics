@@ -93,13 +93,22 @@ SET(${PROJECT_NAME}_INCLUDE_DIRS
     )
 
 SET(${PROJECT_NAME}_CPP_FILES
-                        src/ROVCamera.cpp
-                        src/ROVOperator.cpp
-                        src/StateSender.cpp
-                        src/StateReceiver.cpp
-                        src/Operator.cpp
-                        src/ROV.cpp
+                        src/nodes/ROVCamera.cpp
+                        src/nodes/ROVOperator.cpp
+                        src/nodes/StateSender.cpp
+                        src/nodes/StateReceiver.cpp
+                        src/nodes/Operator.cpp
+                        src/nodes/ROV.cpp
+                        src/msgs/HROVSettings.cpp
+                        src/msgs/HROVSettingsV2.cpp
+                        src/msgs/HROVMoveOrder.cpp
+                        src/msgs/OperatorMessage.cpp
+                        src/msgs/OperatorMessageV2.cpp
+                        src/msgs/HROVMessage.cpp
+                        src/msgs/HROVMessageV2.cpp
+                        src/msgs/TeleopOrder.cpp
                         )
+
 SET(${PROJECT_NAME}_CXX_COMPILE_FLAGS "-fPIC -std=c++14")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${${PROJECT_NAME}_CXX_COMPILE_FLAGS}")
 
