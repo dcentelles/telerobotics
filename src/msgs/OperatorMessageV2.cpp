@@ -110,12 +110,12 @@ void OperatorMessageV2::SetOrderSeqNumber(uint8_t seq) {
       seq ? *messageInfo | ORDER_SEQ_FLAG : *messageInfo & ~ORDER_SEQ_FLAG;
 }
 
-void OperatorMessageV2::CancelLastOrderFlag(bool v) {
+void OperatorMessageV2::CancelLastOrder(bool v) {
   *messageInfo = v ? *messageInfo | CANCEL_LAST_ORDER_FLAGH
                    : *messageInfo & ~CANCEL_LAST_ORDER_FLAGH;
 }
 
-bool OperatorMessageV2::CancelLastOrderFlag() {
+bool OperatorMessageV2::CancelLastOrder() {
   return *messageInfo & CANCEL_LAST_ORDER_FLAGH;
 }
 

@@ -37,8 +37,8 @@ public:
   void SetOrderSeqNumber(uint8_t);
   //  uint8_t IncOrderSeqNumber();
 
-  void CancelLastOrderFlag(bool);
-  bool CancelLastOrderFlag();
+  void CancelLastOrder(bool);
+  bool CancelLastOrder();
 
   enum OrderType {
     NoOrder = 0,
