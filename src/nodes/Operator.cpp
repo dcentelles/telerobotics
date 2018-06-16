@@ -32,8 +32,7 @@ Operator::Operator() : txservice(this), rxservice(this) {
   maxPacketLength = MAX_PACKET_LENGTH;
 
   dlfcrctype = CRC16;
-  buffer = new uint8_t[maxPacketLength*2 + MAX_IMG_SIZE + IMG_CHKSUM_SIZE +
-                       MAX_IMG_SIZE];
+  buffer = new uint8_t[maxPacketLength * 2 + MAX_IMG_SIZE + IMG_CHKSUM_SIZE];
 
   rxStateBegin = buffer;
   txStateBegin = rxStateBegin + MAX_PACKET_LENGTH;
@@ -124,7 +123,9 @@ void Operator::_TxWork() {
   }
   if (_canTransmit) {
     _SendPacketWithDesiredState();
-    std::this_thread::sleep_for(chrono::milliseconds(800));
+    auto lastPktSize = txdlf->GetPacketSize();
+    auto milis = (int) (lastPktSize * 8 / 400. * 1000);
+    std::this_thread::sleep_for(chrono::milliseconds(milis));
   } else
     std::this_thread::sleep_for(chrono::milliseconds(50));
 }
@@ -141,9 +142,9 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
   if (rxdlf->PacketIsOk()) {
     Log->info("Packet received ({} bytes)", rxdlf->GetPacketSize());
 
-    msgInfo = _GetMsgInfo();
+    msgInfo = *rxMsgInfoPtr;
     rxStateLength = _GetStateSize(msgInfo);
-    trunkSize = rxdlf->GetPayloadSize() - rxStateLength;
+    trunkSize = rxdlf->GetPayloadSize() - rxStateLength - MSG_INFO_SIZE;
 
     imgTrunkPtr = rxStatePtr + rxStateLength;
 
@@ -156,16 +157,16 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
 }
 
 void Operator::_UpdateImgBufferFromLastMsg() {
-  if (msgInfo != 0) {
+  if (msgInfo != 0 && trunkSize > 0) {
     if (msgInfo & IMG_FIRST_TRUNK_FLAG) // the received trunk is the first
-                                          // trunk of an image
+                                        // trunk of an image
     {
       Log->debug("RX: the received trunk is the first trunk of an image");
       memcpy(beginImgPtr, imgTrunkPtr, trunkSize);
       currentImgPtr = beginImgPtr + trunkSize;
       if (msgInfo & IMG_LAST_TRUNK_FLAG) // the received trunk is also the
-                                           // last of an image (the image only
-                                           // has 1 trunk)
+                                         // last of an image (the image only
+                                         // has 1 trunk)
       {
         Log->debug("RX: the received trunk is also the last of an image (the "
                    "image only has 1 trunk)");
@@ -190,7 +191,7 @@ void Operator::_UpdateImgBufferFromLastMsg() {
     }
   } else {
     // else, packet without an image trunk
-    Log->warn("RX: packet received without an image trunk");
+    Log->debug("RX: packet received without an image trunk");
   }
 }
 void Operator::_LastTrunkReceived(uint8_t trunkSize) {
@@ -208,12 +209,6 @@ void Operator::_LastTrunkReceived(uint8_t trunkSize) {
   } else {
     Log->warn("RX: image received with errors... (some packets were lost)");
   }
-}
-
-uint8_t Operator::_GetMsgInfo() {
-  uint8_t result;
-  result = *rxMsgInfoPtr & ~MSG_STATE_SIZE_MASK;
-  return result;
 }
 
 uint8_t Operator::_GetStateSize(uint8_t rawInfo) {

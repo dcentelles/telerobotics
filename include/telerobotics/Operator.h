@@ -97,7 +97,6 @@ private:
   void _RxWork(); // for full duplex
   void _TxWork(); // for full duplex
 
-  uint8_t _GetMsgInfo();
   uint8_t _GetStateSize(uint8_t rawInfo);
   void _LastTrunkReceived(uint8_t trunkSize);
 

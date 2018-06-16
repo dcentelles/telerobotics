@@ -13,7 +13,7 @@ namespace telerobotics {
 static const int MSG_INFO_SIZE = 1;
 static const int IMG_FIRST_TRUNK_FLAG = 0x80;
 static const int IMG_LAST_TRUNK_FLAG = 0x40;
-static const int MAX_IMG_SIZE = 16383; //(2^14-1)
+static const int MAX_IMG_SIZE = 4096;
 static const int MAX_IMG_TRUNK_LENGTH = 150;
 static const int MAX_NODE_STATE_LENGTH = 40;
 static const int IMG_CHKSUM_SIZE = 2;

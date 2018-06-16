@@ -80,7 +80,7 @@ void ROV::SendImage(void *_buf, unsigned int _length) {
   // TEMPORAL CHECK
   uint32_t crc = Checksum::crc16(_beginImgPtr, _length + IMG_CHKSUM_SIZE);
   if (crc != 0) {
-    Log->critical("data link frame with errors before transmission");
+    Log->critical("image corrupted before transmission?");
   }
 
   _imgInBuffer = true;
@@ -179,15 +179,16 @@ void ROV::_UpdateTxStateFromCurrentTxState() {
   _txstatemutex.lock();
   _UpdateTxStateSizeOnMsgInfo();
   memcpy(_txStatePtr, _txStateBegin, _txStateLength);
+  _imgTrunkPtr = _txStatePtr + _txStateLength;
   _txstatemutex.unlock();
 }
 
 void ROV::_UpdateTrunkFlagsOnMsgInfo(uint8_t flags) {
-  *_txMsgInfoPtr |= ~MSG_STATE_SIZE_MASK & flags;
+  *_txMsgInfoPtr = (*_txMsgInfoPtr & MSG_STATE_SIZE_MASK) | flags;
 }
 
 void ROV::_UpdateTxStateSizeOnMsgInfo() {
-  *_txMsgInfoPtr = (~MSG_STATE_SIZE_MASK & *_txMsgInfoPtr) | _txStateLength;
+  *_txMsgInfoPtr = (*_txMsgInfoPtr & ~MSG_STATE_SIZE_MASK) | _txStateLength;
 }
 
 uint8_t ROV::_GetTxStateSizeFromMsgInfo() {

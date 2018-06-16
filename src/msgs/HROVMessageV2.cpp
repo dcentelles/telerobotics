@@ -193,5 +193,5 @@ void HROVMessageV2::Armed(bool v) {
   *flags = v ? *flags | ARMED_FLAG : *flags & ~ARMED_FLAG;
 }
 
-uint32_t HROVMessageV2::GetMsgSize() { HROVMessageV2::MessageLength; }
+uint32_t HROVMessageV2::GetMsgSize() { return HROVMessageV2::MessageLength; }
 } /* namespace merbots */

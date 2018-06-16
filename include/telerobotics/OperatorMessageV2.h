@@ -52,6 +52,7 @@ public:
     OtherNotImplemented
   };
   OrderType GetOrderType();
+  OrderType GetOrderType(uint8_t src);
   TeleopOrderPtr GetMoveOrderCopy();
   void SetMoveOrder(TeleopOrderPtr);
   void SetNoOrder();
@@ -65,6 +66,8 @@ public:
   void SetUpdateImageSettingsOrder(HROVSettingsV2Ptr);
   void SetOrderOrderIncomming();
   uint32_t GetMsgSize();
+  uint32_t GetMsgSize(uint8_t * src);
+  uint32_t GetOrderSize(OrderType otype);
   void SetGoToOrder(int16_t x, int16_t y, int16_t z, int16_t heading);
   void GetGoToOrder(int &x, int &y, int &z, int &heading);
 

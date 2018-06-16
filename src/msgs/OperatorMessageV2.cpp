@@ -61,10 +61,13 @@ void OperatorMessageV2::GetGoToOrder(int &x_, int &y_, int &z_, int &heading_) {
   heading_ = *heading;
 }
 
-uint32_t OperatorMessageV2::GetMsgSize() {
-  OrderType otype = GetOrderType();
-  uint32_t msgSize = 1;
+uint32_t OperatorMessageV2::GetOrderSize(OrderType otype) {
+  uint32_t msgSize = 0;
   switch (otype) {
+  case Move: {
+    msgSize += TeleopOrder::Size;
+    break;
+  }
   case NoOrder: {
     break;
   }
@@ -94,6 +97,17 @@ uint32_t OperatorMessageV2::GetMsgSize() {
     break;
   }
   }
+  return msgSize;
+}
+
+uint32_t OperatorMessageV2::GetMsgSize() {
+  OrderType otype = GetOrderType();
+  return GetOrderSize(otype) + 1;
+}
+
+uint32_t OperatorMessageV2::GetMsgSize(uint8_t *src) {
+  OrderType otype = GetOrderType(*src);
+  return GetOrderSize(otype) + 1;
 }
 
 uint8_t OperatorMessageV2::GetHoldChannelDuration() { return *orderBuffer; }
@@ -151,7 +165,12 @@ void OperatorMessageV2::SetDisableKeepOrientationOrder() {
 }
 
 OperatorMessageV2::OrderType OperatorMessageV2::GetOrderType() {
-  unsigned int type = *messageInfo & ORDER_TYPE_MASK;
+  return GetOrderType(*messageInfo);
+}
+
+OperatorMessageV2::OrderType OperatorMessageV2::GetOrderType(uint8_t src) {
+
+  unsigned int type = src & ORDER_TYPE_MASK;
   return type >= 0 && type < OtherNotImplemented ? (OrderType)type
                                                  : OtherNotImplemented;
 }
@@ -180,11 +199,11 @@ bool OperatorMessageV2::CancelLastOrder() {
 }
 
 void OperatorMessageV2::UpdateFromBuffer(uint8_t *_stateb) {
-  memcpy(buffer, _stateb, MessageLength);
+  memcpy(buffer, _stateb, GetMsgSize(_stateb));
 }
 
 void OperatorMessageV2::GetBufferCopy(uint8_t *_stateb) {
-  memcpy(_stateb, buffer, MessageLength);
+  memcpy(_stateb, buffer, GetMsgSize());
 }
 
 } /* namespace merbots */
