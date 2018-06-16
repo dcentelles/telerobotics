@@ -30,7 +30,7 @@ ROVCamera::ROVCamera(LinkType _linkType)
   _SetEndianess();
   rxStateLength = MAX_NODE_STATE_LENGTH;
   txStateLength = MAX_NODE_STATE_LENGTH;
-  imgTrunkInfoLength = IMG_TRUNK_INFO_SIZE;
+  imgTrunkInfoLength = MSG_INFO_SIZE;
   maxImgTrunkLength = MAX_IMG_TRUNK_LENGTH;
   maxPacketLength = MAX_PACKET_LENGTH;
 
@@ -207,7 +207,7 @@ void ROVCamera::Start() {
 
   txStatePtr = txbuffer;
   imgTrunkInfoPtr = (uint16_t *)(txStatePtr + txStateLength);
-  imgTrunkPtr = ((uint8_t *)imgTrunkInfoPtr) + IMG_TRUNK_INFO_SIZE;
+  imgTrunkPtr = ((uint8_t *)imgTrunkInfoPtr) + MSG_INFO_SIZE;
 
   currentImgPtr = beginImgPtr; // No image in buffer
   endImgPtr = currentImgPtr;   //
@@ -331,7 +331,7 @@ void ROVCamera::_SendPacketWithCurrentStateAndImgTrunk() {
     } else {
       *imgTrunkInfoPtr = 0;
       txdlf->PayloadUpdated(TransportPDU::OverheadSize + txStateLength +
-                            IMG_TRUNK_INFO_SIZE);
+                            MSG_INFO_SIZE);
       Log->debug("TX: transmitting packet without an image trunk (only the "
                  "current state (Seq: {}) (FS: {})",
                  txtrp->GetSeqNum(), txdlf->GetFrameSize());

@@ -10,7 +10,7 @@
 
 #include <cpplogging/Loggable.h>
 #include <dccomms/Utils.h>
-#include <dccomms_packets/SimplePacket.h>
+#include <dccomms_packets/VariableLengthPacket.h>
 #include <functional>
 #include <iostream>
 #include <mutex>
@@ -27,11 +27,8 @@ class Operator : public Loggable {
 public:
   Operator();
   virtual ~Operator();
-  void SetDesiredState(const void *data);
+  void SetTxState(const void *data, uint32_t length);
   void SetComms(Ptr<CommsDevice> comms);
-
-  uint32_t GetRxPacketSize();
-  uint32_t GetTxPacketSize();
 
   // http://stackoverflow.com/questions/2298242/callback-functions-in-c
   /*
@@ -49,32 +46,23 @@ public:
   void GetLastConfirmedState(void *);
 
   void Start();
-
-  int GetImageSizeFromNumberOfPackets(int npackets);
-  void SetMaxImageTrunkLength(int);
-  void SetRxStateSize(int);
-  void SetTxStateSize(int);
   void DisableTransmission();
   void EnableTransmission();
 
 private:
-  void _UpdateRxStateSize(int);
-  void _UpdateTxStateSize(int);
-
   bool _canTransmit;
   f_notification imageReceivedCallback;
   f_notification stateReceivedCallback;
 
   std::mutex immutex, txstatemutex, rxstatemutex;
   uint8_t *buffer;
-  uint8_t *currentRxState,
-      *desiredState, // == currentTxState
-      *beginImgPtr, *beginLastImgPtr;
+  uint8_t *rxStateBegin,
+      *txStateBegin, *beginImgPtr;
   uint16_t lastImgSize;
 
   Ptr<CommsDevice> _comms;
-  Ptr<SimplePacket> txdlf;
-  Ptr<SimplePacket> rxdlf;
+  Ptr<VariableLengthPacket> txdlf;
+  Ptr<VariableLengthPacket> rxdlf;
 
   ServiceThread<Operator> txservice;
   ServiceThread<Operator> rxservice;
@@ -87,11 +75,11 @@ private:
   ///// RX ////
   uint8_t *rxStatePtr, *imgTrunkPtr, *rxbuffer, *currentImgPtr;
 
-  uint16_t *imgTrunkInfoPtr;
+  uint8_t *rxMsgInfoPtr;
 
   int rxStateLength, txStateLength;
   int imgTrunkInfoLength;
-  int maxImgTrunkLength;
+  int imageTrunkLength;
   int maxPacketLength;
   // int minPacketLength;
 
@@ -109,10 +97,11 @@ private:
   void _RxWork(); // for full duplex
   void _TxWork(); // for full duplex
 
-  uint16_t _GetTrunkInfo();
-  uint16_t _GetTrunkSize(uint16_t rawInfo);
-  void _LastTrunkReceived(uint16_t trunkSize);
+  uint8_t _GetMsgInfo();
+  uint8_t _GetStateSize(uint8_t rawInfo);
+  void _LastTrunkReceived(uint8_t trunkSize);
 
+  uint8_t msgInfo, trunkSize;
   bool desiredStateSet;
 };
 

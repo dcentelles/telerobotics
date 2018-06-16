@@ -45,7 +45,11 @@ public:
   void IncExpectedOrderSeqNumber();
   void SetHeading(uint16_t);
   uint16_t GetHeading();
-  int16_t GetAltitude();
+  int16_t GetX();
+  void SetX(double);
+  int16_t GetY();
+  void SetY(double);
+  int16_t GetZ();
   void SetZ(double);
   int16_t GetRoll();
   void SetRoll(double);
@@ -63,6 +67,7 @@ public:
 
   void Armed(bool);
   bool Armed();
+  uint32_t GetMsgSize();
 
 private:
   void _Init();
@@ -74,7 +79,8 @@ private:
 
   const static uint8_t NAV_MODE_MASK = 0x3;
 
-  uint8_t *flags, *pose;
+  uint8_t *flags, *orientation, *position;
+  int16_t *x, *y, *z;
 
   bool bigEndian;
 };

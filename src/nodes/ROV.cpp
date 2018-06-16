@@ -23,16 +23,16 @@ ROV::ROV() : _commsWorker(this), _holdChannelCommsWorker(this) {
   _SetEndianess();
   _rxStateLength = MAX_NODE_STATE_LENGTH;
   _txStateLength = MAX_NODE_STATE_LENGTH;
-  _imgTrunkInfoLength = IMG_TRUNK_INFO_SIZE;
-  _maxImgTrunkLength = MAX_IMG_TRUNK_LENGTH;
+  _imgTrunkInfoLength = MSG_INFO_SIZE;
+  _imgTrunkLength = MAX_IMG_TRUNK_LENGTH;
   _maxPacketLength = MAX_PACKET_LENGTH;
 
   _dlfcrctype = CRC16;
-  _buffer = new uint8_t[_maxPacketLength + MAX_NODE_STATE_LENGTH * 2 +
+  _buffer = new uint8_t[_maxPacketLength * 2 + MAX_IMG_SIZE + IMG_CHKSUM_SIZE +
                         MAX_IMG_SIZE]; // buffer max size is orientative...
-  _currentRxState = _buffer;
-  _currentTxState = _currentRxState + _rxStateLength;
-  _beginImgPtr = _currentTxState + _txStateLength;
+  _rxStateBegin = _buffer;
+  _txStateBegin = _rxStateBegin + MAX_PACKET_LENGTH;
+  _beginImgPtr = _txStateBegin + MAX_PACKET_LENGTH;
   _imgInBuffer = false;
   _lastImageSentCallback = &defaultLastImageSentCallback;
   _ordersReceivedCallback = &defaultOrdersReceivedCallback;
@@ -50,24 +50,10 @@ ROV::~ROV() {
   delete _buffer;
 }
 
-void ROV::SetMaxImageTrunkLength(int _len) {
+void ROV::SetImageTrunkLength(int _len) {
   _len = _len <= MAX_IMG_TRUNK_LENGTH ? _len : MAX_IMG_TRUNK_LENGTH;
-  _maxImgTrunkLength = _len;
+  _imgTrunkLength = _len;
   Log->debug("Set a new maximum image trunk length: {} bytes", _len);
-}
-
-void ROV::SetTxStateSize(int _len) {
-  _len = _len <= MAX_NODE_STATE_LENGTH ? _len : MAX_NODE_STATE_LENGTH;
-  _txStateLength = _len;
-  _beginImgPtr = _currentTxState + _txStateLength;
-  Log->debug("Set a new Tx-State length: {} bytes", _len);
-}
-void ROV::SetRxStateSize(int _len) {
-  _len = _len <= MAX_NODE_STATE_LENGTH ? _len : MAX_NODE_STATE_LENGTH;
-  _rxStateLength = _len;
-  _currentTxState = _currentRxState + _rxStateLength;
-  SetTxStateSize(_txStateLength);
-  Log->debug("Set a new Rx-State length: {} bytes", _len);
 }
 
 void ROV::SetChecksumType(FCS fcs) { _dlfcrctype = fcs; }
@@ -127,27 +113,19 @@ void ROV::CancelLastImage() {
 
 void ROV::SetComms(Ptr<CommsDevice> comms) { _comms = comms; }
 
-uint32_t ROV::GetTxPacketSize() {
-  return _txStateLength + _imgTrunkInfoLength + _maxImgTrunkLength;
-}
-
-uint32_t ROV::GetRxPacketSize() { return _rxStateLength; }
-
 void ROV::Start() {
-  _txdlf = CreateObject<SimplePacket>(GetTxPacketSize(), _dlfcrctype);
-  _rxdlf = CreateObject<SimplePacket>(GetRxPacketSize(), _dlfcrctype);
+  _txdlf = CreateObject<VariableLengthPacket>();
+  _rxdlf = CreateObject<VariableLengthPacket>();
 
   _txbuffer = _txdlf->GetPayloadBuffer();
   _rxbuffer = _rxdlf->GetPayloadBuffer();
 
-  _txStatePtr = _txbuffer;
-  _imgTrunkInfoPtr = (uint16_t *)(_txStatePtr + _txStateLength);
-  _imgTrunkPtr = ((uint8_t *)_imgTrunkInfoPtr) + IMG_TRUNK_INFO_SIZE;
+  _txMsgInfoPtr = _txbuffer;
+  _txStatePtr = _txMsgInfoPtr + MSG_INFO_SIZE;
+  _rxStatePtr = _rxbuffer;
 
   _currentImgPtr = _beginImgPtr; // No image in buffer
   _endImgPtr = _currentImgPtr;   //
-
-  _rxStatePtr = _rxbuffer;
 
   _holdChannel = false;
 
@@ -159,6 +137,7 @@ void ROV::_WaitForNewOrders() {
   _comms >> _rxdlf;
   if (_rxdlf->PacketIsOk()) {
     Log->info("Packet received ({} bytes)", _rxdlf->GetPacketSize());
+    _rxStateLength = _rxdlf->GetPayloadSize();
     _UpdateCurrentRxStateFromRxState();
     _ordersReceivedCallback(*this);
   } else {
@@ -193,24 +172,38 @@ void ROV::_HoldChannelWork() {
 }
 void ROV::_UpdateCurrentRxStateFromRxState() {
   _rxstatemutex.lock();
-  memcpy(_currentRxState, _rxStatePtr, _rxStateLength);
+  memcpy(_rxStateBegin, _rxStatePtr, _rxStateLength);
   _rxstatemutex.unlock();
 }
 void ROV::_UpdateTxStateFromCurrentTxState() {
   _txstatemutex.lock();
-  memcpy(_txStatePtr, _currentTxState, _txStateLength);
+  _UpdateTxStateSizeOnMsgInfo();
+  memcpy(_txStatePtr, _txStateBegin, _txStateLength);
   _txstatemutex.unlock();
+}
+
+void ROV::_UpdateTrunkFlagsOnMsgInfo(uint8_t flags) {
+  *_txMsgInfoPtr |= ~MSG_STATE_SIZE_MASK & flags;
+}
+
+void ROV::_UpdateTxStateSizeOnMsgInfo() {
+  *_txMsgInfoPtr = (~MSG_STATE_SIZE_MASK & *_txMsgInfoPtr) | _txStateLength;
+}
+
+uint8_t ROV::_GetTxStateSizeFromMsgInfo() {
+  return *_txMsgInfoPtr & MSG_STATE_SIZE_MASK;
 }
 
 void ROV::GetCurrentRxState(void *dst) {
   _rxstatemutex.lock();
-  memcpy(dst, _currentRxState, _rxStateLength);
+  memcpy(dst, _rxStateBegin, _rxStateLength);
   _rxstatemutex.unlock();
 }
 
-void ROV::SetCurrentTxState(void *src) {
+void ROV::SetCurrentTxState(void *src, uint32_t length) {
   _txstatemutex.lock();
-  memcpy(_currentTxState, src, _txStateLength);
+  _txStateLength = length;
+  memcpy(_txStateBegin, src, _txStateLength);
   _txstatemutex.unlock();
   _txStateSet = true;
 }
@@ -218,43 +211,34 @@ void ROV::SetCurrentTxState(void *src) {
 void ROV::_SendPacketWithCurrentStateAndImgTrunk() {
   if (_comms->BusyTransmitting()) {
     if (!_holdChannel)
-      Log->critical("TX: possible bug: device busy transmitting before next packet build");
+      Log->critical("TX: possible bug: device busy transmitting before next "
+                    "packet build");
     return;
   }
+  uint8_t trunkFlags = 0;
   if (_txStateSet) {
     int bytesLeft = _endImgPtr - _currentImgPtr;
-    int nextTrunkLength;
-    uint16_t trunkInfo = 0;
+    int nextTrunkLength = 0;
 
     _UpdateTxStateFromCurrentTxState();
 
     if (bytesLeft > 0) // == (ImgInBuffer == True)
     {
-      if (bytesLeft > _maxImgTrunkLength) {
-        nextTrunkLength = _maxImgTrunkLength;
+      if (bytesLeft > _imgTrunkLength) {
+        nextTrunkLength = _imgTrunkLength;
       } else {
-        trunkInfo |= IMG_LAST_TRUNK_FLAG;
+        trunkFlags |= IMG_LAST_TRUNK_FLAG;
         nextTrunkLength = bytesLeft;
       }
       if (_beginImgPtr == _currentImgPtr)
-        trunkInfo |= IMG_FIRST_TRUNK_FLAG;
-
-      trunkInfo |= nextTrunkLength;
-
-      if (_bigEndian)
-        *_imgTrunkInfoPtr = trunkInfo;
-      else {
-        Utils::IntSwitchEndian(_imgTrunkInfoPtr, trunkInfo);
-      }
+        trunkFlags |= IMG_FIRST_TRUNK_FLAG;
 
       memcpy(_imgTrunkPtr, _currentImgPtr, nextTrunkLength);
       _currentImgPtr += nextTrunkLength;
-
-      _txdlf->UpdateFCS();
-    } else {
-      *_imgTrunkInfoPtr = 0;
-      _txdlf->UpdateFCS();
     }
+    _UpdateTrunkFlagsOnMsgInfo(trunkFlags);
+    _txdlf->PayloadUpdated(MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() + nextTrunkLength);
+    _txdlf->UpdateFCS();
     Log->info("Sending packet ({} bytes)", _txdlf->GetPacketSize());
     *_comms << _txdlf;
   } else {

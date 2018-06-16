@@ -47,6 +47,8 @@ public:
     HoldChannel,
     UpdateImageSettings,
     DisableKeepOrientation,
+    GoTo,
+    OrderIncomming,
     OtherNotImplemented
   };
   OrderType GetOrderType();
@@ -61,6 +63,10 @@ public:
 
   HROVSettingsV2Ptr GetImageSettingsOrderCopy();
   void SetUpdateImageSettingsOrder(HROVSettingsV2Ptr);
+  void SetOrderOrderIncomming();
+  uint32_t GetMsgSize();
+  void SetGoToOrder(int16_t x, int16_t y, int16_t z, int16_t heading);
+  void GetGoToOrder(int &x, int &y, int &z, int &heading);
 
 private:
   void _SetOrderType(OrderType);
@@ -71,6 +77,7 @@ private:
                        ORDER_TYPE_MASK = 0xf;
   uint8_t *messageInfo;
   uint8_t *orderBuffer;
+  int16_t *x, *y, *z, *heading;
 
   bool _bigEndian;
 };

@@ -32,7 +32,7 @@ ROVOperator::ROVOperator(LinkType _linkType)
   txStatePtr = 0;
 
   bigEndian = DataLinkFrame::IsBigEndian();
-  imgTrunkInfoLength = IMG_TRUNK_INFO_SIZE;
+  imgTrunkInfoLength = MSG_INFO_SIZE;
   maxImgTrunkLength = MAX_IMG_TRUNK_LENGTH;
   maxPacketLength = MAX_PACKET_LENGTH;
 
@@ -206,7 +206,7 @@ void ROVOperator::Start() {
   rxStatePtr = rxbuffer;
 
   imgTrunkInfoPtr = (uint16_t *)(rxStatePtr + rxStateLength);
-  imgTrunkPtr = ((uint8_t *)imgTrunkInfoPtr) + IMG_TRUNK_INFO_SIZE;
+  imgTrunkPtr = ((uint8_t *)imgTrunkInfoPtr) + MSG_INFO_SIZE;
 
   currentImgPtr = beginImgPtr;
 

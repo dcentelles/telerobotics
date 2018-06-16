@@ -30,10 +30,70 @@ void OperatorMessageV2::_Init() {
   orderBuffer = messageInfo + 1;
 
   *messageInfo = 0;
+
+  x = (int16_t *)orderBuffer;
+  y = x + 1;
+  z = y + 1;
+  heading = z + 1;
 }
 
 OperatorMessageV2::~OperatorMessageV2() {
   // TODO Auto-generated destructor stub
+}
+
+void OperatorMessageV2::SetOrderOrderIncomming() {
+  _SetOrderType(OrderType::OrderIncomming);
+}
+
+void OperatorMessageV2::SetGoToOrder(int16_t x_, int16_t y_, int16_t z_,
+                                     int16_t heading_) {
+  *x = x_;
+  *y = y_;
+  *z = z_;
+  *heading = heading_;
+  _SetOrderType(OrderType::GoTo);
+}
+
+void OperatorMessageV2::GetGoToOrder(int &x_, int &y_, int &z_, int &heading_) {
+  x_ = *x;
+  y_ = *y;
+  z_ = *z;
+  heading_ = *heading;
+}
+
+uint32_t OperatorMessageV2::GetMsgSize() {
+  OrderType otype = GetOrderType();
+  uint32_t msgSize = 1;
+  switch (otype) {
+  case NoOrder: {
+    break;
+  }
+  case KeepOrientation: {
+    msgSize += 2;
+    break;
+  }
+  case HoldChannel: {
+    msgSize += 1;
+    break;
+  }
+  case DisableKeepOrientation: {
+    break;
+  }
+  case UpdateImageSettings: {
+    msgSize += HROVSettingsV2::SettingsSize;
+    break;
+  }
+  case GoTo: {
+    msgSize += 8;
+    break;
+  }
+  case OrderIncomming: {
+    break;
+  }
+  case OtherNotImplemented: {
+    break;
+  }
+  }
 }
 
 uint8_t OperatorMessageV2::GetHoldChannelDuration() { return *orderBuffer; }

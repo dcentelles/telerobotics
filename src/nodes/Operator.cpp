@@ -21,23 +21,25 @@ Operator::Operator() : txservice(this), rxservice(this) {
   rxbuffer = 0;
   imgTrunkPtr = 0;
   txbuffer = 0;
-  imgTrunkInfoPtr = 0;
+  rxMsgInfoPtr = 0;
   currentImgPtr = 0;
   rxStatePtr = 0;
   txStatePtr = 0;
 
   bigEndian = DataLinkFrame::IsBigEndian();
-  imgTrunkInfoLength = IMG_TRUNK_INFO_SIZE;
-  maxImgTrunkLength = MAX_IMG_TRUNK_LENGTH;
+  imgTrunkInfoLength = MSG_INFO_SIZE;
+  imageTrunkLength = MAX_IMG_TRUNK_LENGTH;
   maxPacketLength = MAX_PACKET_LENGTH;
 
   dlfcrctype = CRC16;
-  buffer = new uint8_t[maxPacketLength + MAX_IMG_SIZE + IMG_CHKSUM_SIZE +
+  buffer = new uint8_t[maxPacketLength*2 + MAX_IMG_SIZE + IMG_CHKSUM_SIZE +
                        MAX_IMG_SIZE];
 
-  currentRxState = buffer;
-  _UpdateRxStateSize(MAX_NODE_STATE_LENGTH);
-  _UpdateTxStateSize(MAX_NODE_STATE_LENGTH);
+  rxStateBegin = buffer;
+  txStateBegin = rxStateBegin + MAX_PACKET_LENGTH;
+  beginImgPtr = txStateBegin + MAX_PACKET_LENGTH;
+
+  currentImgPtr = beginImgPtr;
 
   lastImgSize = 0;
   imgInBuffer = false;
@@ -61,47 +63,10 @@ Operator::~Operator() {
 
 void Operator::SetComms(Ptr<CommsDevice> comms) { _comms = comms; }
 
-int Operator::GetImageSizeFromNumberOfPackets(int npackets) {
-  int fcsSize = 2;
-  int res = maxImgTrunkLength * (npackets - 1) + maxImgTrunkLength - fcsSize;
-  res = res >= 0 ? res : 0;
-  return res;
-}
-
-void Operator::SetMaxImageTrunkLength(int _len) {
-  _len = _len <= MAX_IMG_TRUNK_LENGTH ? _len : MAX_IMG_TRUNK_LENGTH;
-  maxImgTrunkLength = _len;
-}
-
-void Operator::SetRxStateSize(int _len) {
-  _len = _len <= MAX_NODE_STATE_LENGTH ? _len : MAX_NODE_STATE_LENGTH;
-  _UpdateRxStateSize(_len);
-  Log->debug("Set a new Rx-State length: {} bytes", _len);
-}
-
-void Operator::SetTxStateSize(int _len) {
-  _len = _len <= MAX_NODE_STATE_LENGTH ? _len : MAX_NODE_STATE_LENGTH;
-  _UpdateTxStateSize(_len);
-  Log->debug("Set a new Tx-State length: {} bytes", _len);
-}
-
-void Operator::_UpdateRxStateSize(int _len) {
-  rxStateLength = _len;
-  desiredState = currentRxState + rxStateLength;
-  beginImgPtr = desiredState + txStateLength;
-  beginLastImgPtr = beginImgPtr + MAX_IMG_SIZE;
-}
-
-void Operator::_UpdateTxStateSize(int _len) {
-  txStateLength = _len;
-  beginImgPtr = desiredState + txStateLength;
-  beginLastImgPtr = beginImgPtr + MAX_IMG_SIZE;
-}
-
 int Operator::GetLastReceivedImage(void *data) {
   int imgSize;
   immutex.lock();
-  memcpy(data, beginLastImgPtr, lastImgSize);
+  memcpy(data, beginImgPtr, lastImgSize);
   imgSize = lastImgSize;
   immutex.unlock();
 
@@ -110,13 +75,14 @@ int Operator::GetLastReceivedImage(void *data) {
 
 void Operator::GetLastConfirmedState(void *data) {
   rxstatemutex.lock();
-  memcpy(data, currentRxState, rxStateLength);
+  memcpy(data, rxStateBegin, rxStateLength);
   rxstatemutex.unlock();
 }
 
-void Operator::SetDesiredState(const void *_data) {
+void Operator::SetTxState(const void *_data, uint32_t length) {
   txstatemutex.lock();
-  memcpy(desiredState, _data, txStateLength);
+  txStateLength = length;
+  memcpy(txStateBegin, _data, txStateLength);
   txstatemutex.unlock();
   desiredStateSet = true;
 }
@@ -129,15 +95,9 @@ void Operator::SetStateReceivedCallback(f_notification _callback) {
   stateReceivedCallback = _callback;
 }
 
-uint32_t Operator::GetTxPacketSize() { return txStateLength; }
-
-uint32_t Operator::GetRxPacketSize() {
-  return rxStateLength + imgTrunkInfoLength + maxImgTrunkLength;
-}
-
 void Operator::Start() {
-  txdlf = CreateObject<SimplePacket>(GetTxPacketSize(), dlfcrctype);
-  rxdlf = CreateObject<SimplePacket>(GetRxPacketSize(), dlfcrctype);
+  txdlf = CreateObject<VariableLengthPacket>();
+  rxdlf = CreateObject<VariableLengthPacket>();
 
   auto txdlbuffer = txdlf->GetPayloadBuffer();
   auto rxdlbuffer = rxdlf->GetPayloadBuffer();
@@ -145,13 +105,10 @@ void Operator::Start() {
   txbuffer = txdlf->GetPayloadBuffer();
   rxbuffer = rxdlf->GetPayloadBuffer();
 
+  rxMsgInfoPtr = rxbuffer;
+  rxStatePtr = rxMsgInfoPtr + MSG_INFO_SIZE;
+
   txStatePtr = txbuffer;
-  rxStatePtr = rxbuffer;
-
-  imgTrunkInfoPtr = (uint16_t *)(rxStatePtr + rxStateLength);
-  imgTrunkPtr = ((uint8_t *)imgTrunkInfoPtr) + IMG_TRUNK_INFO_SIZE;
-
-  currentImgPtr = beginImgPtr;
 
   txservice.Start();
   rxservice.Start();
@@ -183,6 +140,13 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
   *_comms >> rxdlf;
   if (rxdlf->PacketIsOk()) {
     Log->info("Packet received ({} bytes)", rxdlf->GetPacketSize());
+
+    msgInfo = _GetMsgInfo();
+    rxStateLength = _GetStateSize(msgInfo);
+    trunkSize = rxdlf->GetPayloadSize() - rxStateLength;
+
+    imgTrunkPtr = rxStatePtr + rxStateLength;
+
     _UpdateLastConfirmedStateFromLastMsg();
     _UpdateImgBufferFromLastMsg();
     stateReceivedCallback(*this);
@@ -192,17 +156,14 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
 }
 
 void Operator::_UpdateImgBufferFromLastMsg() {
-  uint16_t trunkInfo = _GetTrunkInfo();
-  uint16_t trunkSize = _GetTrunkSize(trunkInfo);
-
-  if (trunkInfo != 0) {
-    if (trunkInfo & IMG_FIRST_TRUNK_FLAG) // the received trunk is the first
+  if (msgInfo != 0) {
+    if (msgInfo & IMG_FIRST_TRUNK_FLAG) // the received trunk is the first
                                           // trunk of an image
     {
       Log->debug("RX: the received trunk is the first trunk of an image");
       memcpy(beginImgPtr, imgTrunkPtr, trunkSize);
       currentImgPtr = beginImgPtr + trunkSize;
-      if (trunkInfo & IMG_LAST_TRUNK_FLAG) // the received trunk is also the
+      if (msgInfo & IMG_LAST_TRUNK_FLAG) // the received trunk is also the
                                            // last of an image (the image only
                                            // has 1 trunk)
       {
@@ -216,7 +177,7 @@ void Operator::_UpdateImgBufferFromLastMsg() {
       {
         memcpy(currentImgPtr, imgTrunkPtr, trunkSize);
         currentImgPtr += trunkSize;
-        if (trunkInfo &
+        if (msgInfo &
             IMG_LAST_TRUNK_FLAG) // the received trunk is the last of an image
         {
           Log->debug("RX: the received trunk is the last of an image");
@@ -232,7 +193,7 @@ void Operator::_UpdateImgBufferFromLastMsg() {
     Log->warn("RX: packet received without an image trunk");
   }
 }
-void Operator::_LastTrunkReceived(uint16_t trunkSize) {
+void Operator::_LastTrunkReceived(uint8_t trunkSize) {
   int blockSize = currentImgPtr - beginImgPtr;
 
   currentImgPtr = beginImgPtr;
@@ -240,7 +201,7 @@ void Operator::_LastTrunkReceived(uint16_t trunkSize) {
   if (crc == 0) {
     immutex.lock();
     lastImgSize = blockSize - IMG_CHKSUM_SIZE;
-    memcpy(beginLastImgPtr, beginImgPtr, lastImgSize);
+    memcpy(beginImgPtr, beginImgPtr, lastImgSize);
     immutex.unlock();
 
     imageReceivedCallback(*this);
@@ -249,25 +210,24 @@ void Operator::_LastTrunkReceived(uint16_t trunkSize) {
   }
 }
 
-uint16_t Operator::_GetTrunkInfo() {
-  uint16_t result;
-  if (bigEndian) {
-    result = *imgTrunkInfoPtr;
-  } else {
-    Utils::IntSwitchEndian(&result, *imgTrunkInfoPtr);
-  }
+uint8_t Operator::_GetMsgInfo() {
+  uint8_t result;
+  result = *rxMsgInfoPtr & ~MSG_STATE_SIZE_MASK;
   return result;
 }
 
-uint16_t Operator::_GetTrunkSize(uint16_t rawInfo) { return rawInfo & 0x3fff; }
+uint8_t Operator::_GetStateSize(uint8_t rawInfo) {
+  return rawInfo & MSG_STATE_SIZE_MASK;
+}
 
 void Operator::_SendPacketWithDesiredState() {
   if (desiredStateSet) {
     if (!_comms->BusyTransmitting()) {
       txstatemutex.lock();
-      memcpy(txStatePtr, desiredState, txStateLength);
+      memcpy(txStatePtr, txStateBegin, txStateLength);
       txstatemutex.unlock();
 
+      txdlf->PayloadUpdated(txStateLength);
       txdlf->UpdateFCS();
       Log->info("Sending packet ({} bytes)", txdlf->GetPacketSize());
       *_comms << txdlf;
@@ -282,7 +242,7 @@ void Operator::_SendPacketWithDesiredState() {
 
 void Operator::_UpdateLastConfirmedStateFromLastMsg() {
   rxstatemutex.lock();
-  memcpy(currentRxState, rxStatePtr, rxStateLength);
+  memcpy(rxStateBegin, rxStatePtr, rxStateLength);
   rxstatemutex.unlock();
 }
 

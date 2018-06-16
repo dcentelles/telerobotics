@@ -11,7 +11,7 @@
 #include <condition_variable>
 #include <cpplogging/Loggable.h>
 #include <dccomms/Utils.h>
-#include <dccomms_packets/SimplePacket.h>
+#include <dccomms_packets/VariableLengthPacket.h>
 #include <functional>
 #include <iostream>
 #include <mutex>
@@ -29,8 +29,6 @@ public:
   virtual ~ROV();
 
   void SetComms(Ptr<CommsDevice> _comms);
-  uint32_t GetRxPacketSize();
-  uint32_t GetTxPacketSize();
 
   void SendImage(void *, unsigned int);
 
@@ -41,7 +39,7 @@ public:
   void SetLastImgSentCallback(f_notification);
 
   void GetCurrentRxState(void *dst);
-  void SetCurrentTxState(void *src);
+  void SetCurrentTxState(void *src, uint32_t length);
 
   bool SendingCurrentImage();
   void CancelLastImage();
@@ -49,9 +47,7 @@ public:
   void SetChecksumType(FCS fcs);
   void Start();
 
-  void SetMaxImageTrunkLength(int);
-  void SetRxStateSize(int);
-  void SetTxStateSize(int);
+  void SetImageTrunkLength(int);
 
   void HoldChannel(bool);
   bool HoldingChannel() { return _holdChannel; }
@@ -68,6 +64,9 @@ private:
 
   void _Work(); // for full duplex
   void _HoldChannelWork();
+  void _UpdateTxStateSizeOnMsgInfo();
+  void _UpdateTrunkFlagsOnMsgInfo(uint8_t flags);
+  uint8_t _GetTxStateSizeFromMsgInfo();
 
   bool _holdChannel;
   std::mutex _holdChannel_mutex;
@@ -81,18 +80,18 @@ private:
   f_notification _lastImageSentCallback;
 
   uint8_t *_buffer;
-  uint8_t *_currentRxState, *_currentTxState;
+  uint8_t *_rxStateBegin, *_txStateBegin;
 
   Ptr<CommsDevice> _comms;
 
   ServiceThread<ROV> _commsWorker, _holdChannelCommsWorker;
 
-  Ptr<SimplePacket> _txdlf;
-  Ptr<SimplePacket> _rxdlf;
+  Ptr<VariableLengthPacket> _txdlf;
+  Ptr<VariableLengthPacket> _rxdlf;
   //// TX /////
   uint8_t *_txbuffer;
   uint8_t *_txStatePtr;
-  uint16_t *_imgTrunkInfoPtr;
+  uint8_t *_txMsgInfoPtr;
   uint8_t *_imgTrunkPtr;
 
   uint8_t *_beginImgPtr;
@@ -107,7 +106,7 @@ private:
 
   int _rxStateLength, _txStateLength;
   int _imgTrunkInfoLength;
-  int _maxImgTrunkLength;
+  int _imgTrunkLength;
   int _maxPacketLength;
 
   bool _imgInBuffer;
