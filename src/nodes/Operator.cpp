@@ -124,8 +124,8 @@ void Operator::_TxWork() {
   if (_canTransmit) {
     _SendPacketWithDesiredState();
     auto lastPktSize = txdlf->GetPacketSize();
-    auto milis = (int) (lastPktSize * 8 / 400. * 1000);
-    std::this_thread::sleep_for(chrono::milliseconds(milis));
+    auto nanos = (uint32_t) (lastPktSize * 8 / 200. * 1e9);
+    std::this_thread::sleep_for(chrono::nanoseconds(nanos));
   } else
     std::this_thread::sleep_for(chrono::milliseconds(50));
 }

@@ -55,7 +55,7 @@ public:
 private:
   void _ReinitImageFlags();
   void _WaitForNewOrders();
-  void _SendPacketWithCurrentStateAndImgTrunk();
+  void _SendPacketWithCurrentStateAndImgTrunk(bool block = false);
   void _CheckIfEntireImgIsSent();
 
   void _UpdateCurrentRxStateFromRxState();

@@ -85,7 +85,7 @@ void ROV::SendImage(void *_buf, unsigned int _length) {
 
   _imgInBuffer = true;
   lock.unlock();
-  _imgInBufferCond.notify_one();
+  _imgInBufferCond.notify_all();
   Log->debug("New image available to transmit ({} bytes).", _length);
 
   // mutex is unlocked automatically when calling the unique_lock destructor:
@@ -154,8 +154,11 @@ void ROV::_Work() {
 }
 
 void ROV::HoldChannel(bool v) {
+  _immutex.lock();
+  _ReinitImageFlags();
   _holdChannel = v;
   _holdChannel_cond.notify_one();
+  _immutex.unlock();
 }
 
 void ROV::_HoldChannelWork() {
@@ -167,8 +170,10 @@ void ROV::_HoldChannelWork() {
   while (!_imgInBuffer) {
     _imgInBufferCond.wait(lock);
   }
-  _SendPacketWithCurrentStateAndImgTrunk();
-  _CheckIfEntireImgIsSent();
+  if (_holdChannel) {
+    _SendPacketWithCurrentStateAndImgTrunk(true);
+    _CheckIfEntireImgIsSent();
+  }
 }
 void ROV::_UpdateCurrentRxStateFromRxState() {
   _rxstatemutex.lock();
@@ -209,7 +214,7 @@ void ROV::SetCurrentTxState(void *src, uint32_t length) {
   _txStateSet = true;
 }
 
-void ROV::_SendPacketWithCurrentStateAndImgTrunk() {
+void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
   if (_comms->BusyTransmitting()) {
     if (!_holdChannel)
       Log->critical("TX: possible bug: device busy transmitting before next "
@@ -238,10 +243,16 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk() {
       _currentImgPtr += nextTrunkLength;
     }
     _UpdateTrunkFlagsOnMsgInfo(trunkFlags);
-    _txdlf->PayloadUpdated(MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() + nextTrunkLength);
+    _txdlf->PayloadUpdated(MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() +
+                           nextTrunkLength);
     _txdlf->UpdateFCS();
     Log->info("Sending packet ({} bytes)", _txdlf->GetPacketSize());
     *_comms << _txdlf;
+    if (block) {
+      auto lastPktSize = _txdlf->GetPacketSize();
+      auto nanos = (uint32_t)(lastPktSize * 8 / 1850. * 1e9);
+      std::this_thread::sleep_for(chrono::nanoseconds(nanos));
+    }
   } else {
     Log->warn("TX: current state is not set yet");
     Utils::Sleep(1000);
@@ -252,7 +263,7 @@ void ROV::_ReinitImageFlags() {
   _imgInBuffer = false;
   _currentImgPtr = _beginImgPtr;
   _endImgPtr = _currentImgPtr;
-  _imgInBufferCond.notify_one();
+  _imgInBufferCond.notify_all();
 }
 void ROV::_CheckIfEntireImgIsSent() {
   // Check If it has been sent the last image trunk and call the callback
