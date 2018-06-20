@@ -77,7 +77,7 @@ private:
                        LAST_ORDER_CANCELLED_FLAG = 0x20,
                        KEEPING_HEADING_FLAG = 0x10, ARMED_FLAG = 0x8;
 
-  const static uint8_t NAV_MODE_MASK = 0x3;
+  const static uint8_t NAV_MODE_MASK = 0x7;
 
   uint8_t *flags, *orientation, *position;
   int16_t *x, *y, *z;

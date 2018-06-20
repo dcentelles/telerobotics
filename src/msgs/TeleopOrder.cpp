@@ -45,12 +45,12 @@ void TeleopOrder::DisArm(bool disarm) {
 }
 bool TeleopOrder::DisArm() { return *_flags0 & DISARM_FLAG; }
 
-FLY_MODE TeleopOrder::GetFlyMode() {
-  FLY_MODE mode = (FLY_MODE)(*_flags0 & FLY_MODE_MASK);
+ARDUSUB_NAV_MODE TeleopOrder::GetFlyMode() {
+  ARDUSUB_NAV_MODE mode = (ARDUSUB_NAV_MODE)(*_flags0 & FLY_MODE_MASK);
   return mode;
 }
 
-void TeleopOrder::SetFlyMode(FLY_MODE mode) {
+void TeleopOrder::SetFlyMode(ARDUSUB_NAV_MODE mode) {
   *_flags0 &= ~FLY_MODE_MASK;
   *_flags0 |= mode;
 }

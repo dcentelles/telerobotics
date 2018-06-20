@@ -3,11 +3,11 @@
 
 #include <cstdint>
 #include <memory>
+#include <telerobotics/Constants.h>
 
 namespace telerobotics {
 class TeleopOrder;
 typedef std::shared_ptr<TeleopOrder> TeleopOrderPtr;
-enum FLY_MODE { STABILIZE = 1, DEPTH_HOLD = 2, MANUAL = 3 };
 class TeleopOrder {
 public:
   static const int Size = 5;
@@ -39,8 +39,8 @@ public:
 
   void *GetBuffer() { return _buffer; }
 
-  FLY_MODE GetFlyMode();
-  void SetFlyMode(FLY_MODE);
+  ARDUSUB_NAV_MODE GetFlyMode();
+  void SetFlyMode(ARDUSUB_NAV_MODE);
 
 private:
   TeleopOrder();
@@ -51,7 +51,7 @@ private:
   int8_t *_x, *_y, *_z, *_r;
   uint8_t *_flags0;
 
-  const static int FLY_MODE_MASK = 0x3;
+  const static int FLY_MODE_MASK = 0x7;
   const static uint8_t ARM_FLAG = 0x80, DISARM_FLAG = 0x40;
   void _Init();
 };
