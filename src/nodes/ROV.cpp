@@ -86,7 +86,7 @@ void ROV::SendImage(void *_buf, unsigned int _length) {
   _imgInBuffer = true;
   lock.unlock();
   _imgInBufferCond.notify_all();
-  Log->debug("New image available to transmit ({} bytes).", _length);
+  Log->info("TX IMG {}", _length);
 
   // mutex is unlocked automatically when calling the unique_lock destructor:
   // http://www.cplusplus.com/reference/mutex/unique_lock/
@@ -136,12 +136,12 @@ void ROV::Start() {
 void ROV::_WaitForNewOrders() {
   _comms >> _rxdlf;
   if (_rxdlf->PacketIsOk()) {
-    Log->info("Packet received ({} bytes)", _rxdlf->GetPacketSize());
+    Log->info("RX PKT {}", _rxdlf->GetPacketSize());
     _rxStateLength = _rxdlf->GetPayloadSize();
     _UpdateCurrentRxStateFromRxState();
     _ordersReceivedCallback(*this);
   } else {
-    Log->warn("Packet received with errors ({} bytes)",
+    Log->warn("ERR PKT {}",
               _rxdlf->GetPacketSize());
   }
 }
@@ -246,7 +246,7 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
     _txdlf->PayloadUpdated(MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() +
                            nextTrunkLength);
     _txdlf->UpdateFCS();
-    Log->info("Sending packet ({} bytes)", _txdlf->GetPacketSize());
+    Log->info("TX PKT {}", _txdlf->GetPacketSize());
     *_comms << _txdlf;
     if (block) {
       auto lastPktSize = _txdlf->GetPacketSize();

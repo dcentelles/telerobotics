@@ -140,7 +140,7 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
   Log->debug("RX: waiting for frames...");
   *_comms >> rxdlf;
   if (rxdlf->PacketIsOk()) {
-    Log->info("Packet received ({} bytes)", rxdlf->GetPacketSize());
+    Log->info("RX PKT {}", rxdlf->GetPacketSize());
 
     msgInfo = *rxMsgInfoPtr;
     rxStateLength = _GetStateSize(msgInfo);
@@ -152,7 +152,7 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
     _UpdateImgBufferFromLastMsg();
     stateReceivedCallback(*this);
   } else {
-    Log->warn("Packet received with errors ({} bytes)", rxdlf->GetPacketSize());
+    Log->warn("ERR PKT {}", rxdlf->GetPacketSize());
   }
 }
 
@@ -207,7 +207,7 @@ void Operator::_LastTrunkReceived(uint8_t trunkSize) {
 
     imageReceivedCallback(*this);
   } else {
-    Log->warn("RX: image received with errors... (some packets were lost)");
+    Log->warn("ERR IMG");
   }
 }
 
@@ -224,7 +224,7 @@ void Operator::_SendPacketWithDesiredState() {
 
       txdlf->PayloadUpdated(txStateLength);
       txdlf->UpdateFCS();
-      Log->info("Sending packet ({} bytes)", txdlf->GetPacketSize());
+      Log->info("TX PKT {}", txdlf->GetPacketSize());
       *_comms << txdlf;
       while (_comms->BusyTransmitting())
         ;
