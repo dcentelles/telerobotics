@@ -124,7 +124,7 @@ void Operator::_TxWork() {
   if (_canTransmit) {
     _SendPacketWithDesiredState();
     auto lastPktSize = txdlf->GetPacketSize();
-    auto nanos = (uint32_t) (lastPktSize * 8 / 200. * 1e9);
+    auto nanos = (uint32_t)(lastPktSize * 8 / 200. * 1e9);
     std::this_thread::sleep_for(chrono::nanoseconds(nanos));
   } else
     std::this_thread::sleep_for(chrono::milliseconds(50));
@@ -200,6 +200,7 @@ void Operator::_LastTrunkReceived(uint8_t trunkSize) {
   currentImgPtr = beginImgPtr;
   uint16_t crc = Checksum::crc16(beginImgPtr, blockSize);
   if (crc == 0) {
+    Log->info("RX IMG {}", lastImgSize);
     immutex.lock();
     lastImgSize = blockSize - IMG_CHKSUM_SIZE;
     memcpy(beginImgPtr, beginImgPtr, lastImgSize);
@@ -207,7 +208,7 @@ void Operator::_LastTrunkReceived(uint8_t trunkSize) {
 
     imageReceivedCallback(*this);
   } else {
-    Log->warn("ERR IMG");
+    Log->warn("ERR IMG {}", lastImgSize);
   }
 }
 
