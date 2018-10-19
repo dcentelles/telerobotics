@@ -13,13 +13,22 @@ namespace telerobotics {
 static const int MSG_INFO_SIZE = 1;
 static const int IMG_FIRST_TRUNK_FLAG = 0x80;
 static const int IMG_LAST_TRUNK_FLAG = 0x40;
+static const int IMG_ENSURE_DELIVERY = 0x20;
+
+static const int IMG_SEQ = 0x40;
+static const int IMG_TRUNK_SEQ_MASK = 0x3f;
+
 static const int MAX_IMG_SIZE = 4096;
 static const int MAX_IMG_TRUNK_LENGTH = 150;
 static const int MAX_NODE_STATE_LENGTH = 40;
 static const int IMG_CHKSUM_SIZE = 2;
 static const int MAX_PACKET_LENGTH = 2048;
-static const int MSG_STATE_SIZE_MASK = 0x3f;
+static const int MSG_STATE_SIZE_MASK = 0x1f;
 static const int DEFAULT_IMG_TRUNK_LENGTH = 40;
+
+static const int OP_IMG_ENSURE_DELIVERY = 0x80;
+static const int OP_IMG_SEQ = 0x40;
+static const int OP_IMG_REQTRUNKSEQ_MASK = 0x3f;
 
 static const int MAX_HROVSTATE_LENGHT = 40;
 static const int S100_MAX_BITRATE = 1950;

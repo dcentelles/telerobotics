@@ -70,7 +70,7 @@ private:
   FCS dlfcrctype;
 
   ///// TX ////
-  uint8_t *txStatePtr, *txbuffer;
+  uint8_t *txStatePtr, *txbuffer, *txFlags;
 
   ///// RX ////
   uint8_t *rxStatePtr, *imgTrunkPtr, *rxbuffer, *currentImgPtr;
@@ -102,6 +102,19 @@ private:
 
   uint8_t msgInfo, trunkSize;
   bool desiredStateSet;
+
+  bool _HaveImgTrunk(int i);
+  void _MarkLastImgTrunk(int i);
+  void _MarkImgTrunk(int i);
+  int _ImgReceptionCompleted();
+  int _GetReqImgSeq();
+  void _ChangeImgSeq();
+  void _UpdateTrunkSeq();
+  bool baseTrunkSizeSet = false;
+  int baseTrunkSize = 0;
+  int lastTrunkReceived = false;
+  int lastTrunkSize = 0;
+  uint64_t receivedTrunksFlags = 0;
 };
 
 } /* namespace dcauv */

@@ -52,6 +52,9 @@ public:
   void HoldChannel(bool);
   bool HoldingChannel() { return _holdChannel; }
 
+  void SetEnsureImgDelivery(bool v);
+  bool EnsureDelivery();
+
 private:
   void _ReinitImageFlags();
   void _WaitForNewOrders();
@@ -67,8 +70,10 @@ private:
   void _UpdateTxStateSizeOnMsgInfo();
   void _UpdateTrunkFlagsOnMsgInfo(uint8_t flags);
   uint8_t _GetTxStateSizeFromMsgInfo();
+  int _GetRequestedImgSeq();
+  int _GetRequestedImgTrunkSeq();
 
-  bool _holdChannel;
+  bool _holdChannel, _ensureDelivery;
   std::mutex _holdChannel_mutex;
   condition_variable _holdChannel_cond;
 
@@ -100,7 +105,7 @@ private:
   uint8_t *_endImgPtr;
 
   //// RX /////
-  uint8_t *_rxbuffer;
+  uint8_t *_rxbuffer, *_rxflags;
   uint8_t *_rxStatePtr;
   FCS _dlfcrctype;
 

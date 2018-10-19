@@ -41,6 +41,7 @@ ROV::ROV() : _commsWorker(this), _holdChannelCommsWorker(this) {
   _holdChannelCommsWorker.SetWork(&ROV::_HoldChannelWork);
   SetLogName("ROV");
   _txStateSet = false;
+  SetEnsureImgDelivery(true);
 }
 
 ROV::~ROV() {
@@ -122,7 +123,8 @@ void ROV::Start() {
 
   _txMsgInfoPtr = _txbuffer;
   _txStatePtr = _txMsgInfoPtr + MSG_INFO_SIZE;
-  _rxStatePtr = _rxbuffer;
+  _rxflags = _rxbuffer;
+  _rxStatePtr = _rxflags + 1;
 
   _currentImgPtr = _beginImgPtr; // No image in buffer
   _endImgPtr = _currentImgPtr;   //
@@ -134,17 +136,34 @@ void ROV::Start() {
 }
 
 void ROV::_WaitForNewOrders() {
+  int lastImgSeq = _GetRequestedImgSeq();
   _comms >> _rxdlf;
   if (_rxdlf->PacketIsOk()) {
     Log->info("RX PKT {}", _rxdlf->GetPacketSize());
-    _rxStateLength = _rxdlf->GetPayloadSize();
+    auto psize = _rxdlf->GetPayloadSize();
+    if (psize < 1) {
+      Log->critical(
+          "rx payload must be greater than 1 (first byte = rx flags)");
+      return;
+    }
+    int reqImgSeq = _GetRequestedImgSeq();
+    if (lastImgSeq !=
+        reqImgSeq) // This means last image was successfully received
+      _ReinitImageFlags();
+    _rxStateLength = psize - 1;
     _UpdateCurrentRxStateFromRxState();
     _ordersReceivedCallback(*this);
   } else {
-    Log->warn("ERR PKT {}",
-              _rxdlf->GetPacketSize());
+    Log->warn("ERR PKT {}", _rxdlf->GetPacketSize());
   }
 }
+
+int ROV::_GetRequestedImgSeq() { return *_rxflags & OP_IMG_SEQ ? 1 : 0; }
+
+int ROV::_GetRequestedImgTrunkSeq() {
+  return *_rxflags & OP_IMG_REQTRUNKSEQ_MASK;
+}
+
 void ROV::_Work() {
   _WaitForNewOrders();
   _immutex.lock();
@@ -214,6 +233,13 @@ void ROV::SetCurrentTxState(void *src, uint32_t length) {
   _txStateSet = true;
 }
 
+void ROV::SetEnsureImgDelivery(bool v) {
+  _ReinitImageFlags();
+  _ensureDelivery = v;
+}
+
+bool ROV::EnsureDelivery() { return _ensureDelivery; }
+
 void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
   if (_comms->BusyTransmitting()) {
     if (!_holdChannel)
@@ -223,28 +249,71 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
   }
   uint8_t trunkFlags = 0;
   if (_txStateSet) {
-    int bytesLeft = _endImgPtr - _currentImgPtr;
-    int nextTrunkLength = 0;
-
     _UpdateTxStateFromCurrentTxState();
 
-    if (bytesLeft > 0) // == (ImgInBuffer == True)
-    {
-      if (bytesLeft > _imgTrunkLength) {
-        nextTrunkLength = _imgTrunkLength;
-      } else {
-        trunkFlags |= IMG_LAST_TRUNK_FLAG;
-        nextTrunkLength = bytesLeft;
+    int nextTrunkLength = 0;
+    if (_ensureDelivery) {
+      trunkFlags |= IMG_ENSURE_DELIVERY;
+      auto imgTrunkSeq = _GetRequestedImgTrunkSeq();
+      int imgSize = _endImgPtr - _beginImgPtr;
+      // check if requested sequence number is possible
+      int imgPrefix = _imgTrunkLength * imgTrunkSeq;
+      if (imgPrefix >= imgSize) {
+        //if not, we send the last trunk. This will notify the receiver that
+        //he was requesting a trunk sequence soo high (this may happen if the image
+        //size is reduced)
+        imgTrunkSeq = imgSize / _imgTrunkLength;
+        if (imgTrunkSeq * _imgTrunkLength == imgSize)
+          imgTrunkSeq -= 1;
       }
-      if (_beginImgPtr == _currentImgPtr)
-        trunkFlags |= IMG_FIRST_TRUNK_FLAG;
+      uint8_t *imgTrunkPtr = imgTrunkSeq * _imgTrunkLength + _beginImgPtr;
 
-      memcpy(_imgTrunkPtr, _currentImgPtr, nextTrunkLength);
-      _currentImgPtr += nextTrunkLength;
+      if (_imgInBuffer) {
+
+        int bytesLeft = _endImgPtr - imgTrunkPtr;
+        if (bytesLeft > _imgTrunkLength)
+          nextTrunkLength = _imgTrunkLength;
+        else {
+          trunkFlags |= IMG_LAST_TRUNK_FLAG;
+          nextTrunkLength = bytesLeft;
+        }
+        if (imgTrunkSeq == 0) {
+          trunkFlags |= IMG_FIRST_TRUNK_FLAG;
+        }
+
+        memcpy(_imgTrunkPtr + 1, imgTrunkPtr, nextTrunkLength);
+
+        *_imgTrunkPtr = 0;
+        *_imgTrunkPtr = 0 | (_GetRequestedImgSeq() ? IMG_SEQ : 0);
+        *_imgTrunkPtr |= IMG_TRUNK_SEQ_MASK & imgTrunkSeq;
+
+        _UpdateTrunkFlagsOnMsgInfo(trunkFlags);
+        _txdlf->PayloadUpdated(MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() +
+                               1 + nextTrunkLength);
+      }
+
+    } else {
+      int bytesLeft = _endImgPtr - _currentImgPtr;
+
+      if (bytesLeft > 0) // == (ImgInBuffer == True)
+      {
+        if (bytesLeft > _imgTrunkLength) {
+          nextTrunkLength = _imgTrunkLength;
+        } else {
+          trunkFlags |= IMG_LAST_TRUNK_FLAG;
+          nextTrunkLength = bytesLeft;
+        }
+        if (_beginImgPtr == _currentImgPtr)
+          trunkFlags |= IMG_FIRST_TRUNK_FLAG;
+
+        memcpy(_imgTrunkPtr, _currentImgPtr, nextTrunkLength);
+        _currentImgPtr += nextTrunkLength;
+      }
+      _UpdateTrunkFlagsOnMsgInfo(trunkFlags);
+      _txdlf->PayloadUpdated(MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() +
+                             nextTrunkLength);
     }
-    _UpdateTrunkFlagsOnMsgInfo(trunkFlags);
-    _txdlf->PayloadUpdated(MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() +
-                           nextTrunkLength);
+
     _txdlf->UpdateFCS();
     Log->info("TX PKT {}", _txdlf->GetPacketSize());
     *_comms << _txdlf;
@@ -267,7 +336,7 @@ void ROV::_ReinitImageFlags() {
 }
 void ROV::_CheckIfEntireImgIsSent() {
   // Check If it has been sent the last image trunk and call the callback
-  if (_imgInBuffer && _currentImgPtr == _endImgPtr) {
+  if (!_ensureDelivery && _imgInBuffer && _currentImgPtr == _endImgPtr) {
     _ReinitImageFlags();
     _lastImageSentCallback(*this);
     Log->debug("TX: image transmission completed");
