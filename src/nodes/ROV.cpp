@@ -147,6 +147,7 @@ void ROV::_WaitForNewOrders() {
       return;
     }
     int reqImgSeq = _GetRequestedImgSeq();
+    Log->info("RX IMSEQ {} (L. {})", reqImgSeq, lastImgSeq);
     if (lastImgSeq !=
         reqImgSeq) // This means last image was successfully received
       _ReinitImageFlags();
@@ -251,21 +252,25 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
   if (_txStateSet) {
     _UpdateTxStateFromCurrentTxState();
 
+    int payloadSize = 0;
     int nextTrunkLength = 0;
     if (_ensureDelivery) {
       trunkFlags |= IMG_ENSURE_DELIVERY;
-      auto imgTrunkSeq = _GetRequestedImgTrunkSeq();
+      auto reqImgTrunkSeq = _GetRequestedImgTrunkSeq();
+      auto imgTrunkSeq = reqImgTrunkSeq;
       int imgSize = _endImgPtr - _beginImgPtr;
       // check if requested sequence number is possible
       int imgPrefix = _imgTrunkLength * imgTrunkSeq;
       if (imgPrefix >= imgSize) {
-        //if not, we send the last trunk. This will notify the receiver that
-        //he was requesting a trunk sequence soo high (this may happen if the image
-        //size is reduced)
+        // if not, we send the last trunk. This will notify the receiver that
+        // he was requesting a trunk sequence soo high (this may happen if the
+        // image
+        // size is reduced)
         imgTrunkSeq = imgSize / _imgTrunkLength;
         if (imgTrunkSeq * _imgTrunkLength == imgSize)
           imgTrunkSeq -= 1;
       }
+
       uint8_t *imgTrunkPtr = imgTrunkSeq * _imgTrunkLength + _beginImgPtr;
 
       if (_imgInBuffer) {
@@ -280,17 +285,17 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
         if (imgTrunkSeq == 0) {
           trunkFlags |= IMG_FIRST_TRUNK_FLAG;
         }
+        Log->info("TX IMGSIZE {} : IMGSEQ {} (R. {}) : TSIZE {}", imgSize,
+                  imgTrunkSeq, reqImgTrunkSeq, nextTrunkLength);
 
         memcpy(_imgTrunkPtr + 1, imgTrunkPtr, nextTrunkLength);
 
         *_imgTrunkPtr = 0;
         *_imgTrunkPtr = 0 | (_GetRequestedImgSeq() ? IMG_SEQ : 0);
         *_imgTrunkPtr |= IMG_TRUNK_SEQ_MASK & imgTrunkSeq;
-
-        _UpdateTrunkFlagsOnMsgInfo(trunkFlags);
-        _txdlf->PayloadUpdated(MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() +
-                               1 + nextTrunkLength);
       }
+      payloadSize =
+          MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() + 1 + nextTrunkLength;
 
     } else {
       int bytesLeft = _endImgPtr - _currentImgPtr;
@@ -309,11 +314,12 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
         memcpy(_imgTrunkPtr, _currentImgPtr, nextTrunkLength);
         _currentImgPtr += nextTrunkLength;
       }
-      _UpdateTrunkFlagsOnMsgInfo(trunkFlags);
-      _txdlf->PayloadUpdated(MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() +
-                             nextTrunkLength);
+      payloadSize =
+          MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() + nextTrunkLength;
     }
 
+    _UpdateTrunkFlagsOnMsgInfo(trunkFlags);
+    _txdlf->PayloadUpdated(payloadSize);
     _txdlf->UpdateFCS();
     Log->info("TX PKT {}", _txdlf->GetPacketSize());
     *_comms << _txdlf;

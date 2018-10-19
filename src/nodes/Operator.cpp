@@ -138,7 +138,7 @@ void Operator::_RxWork() {
 
 bool Operator::_HaveImgTrunk(int i) { return receivedTrunksFlags & (1 << i); }
 
-void Operator::_MarkImgTrunk(int i) { receivedTrunksFlags |= (uint64_t) 1 << i; }
+void Operator::_MarkImgTrunk(int i) { receivedTrunksFlags |= (uint64_t)1 << i; }
 
 int Operator::_ImgReceptionCompleted() {
   // returns number of trunks if completed, otherwise returns 0
@@ -173,7 +173,7 @@ void Operator::_ChangeImgSeq() {
 
 void Operator::_UpdateTrunkSeq() {
   for (uint64_t i = 0; i < 64; i++) {
-    if (!(receivedTrunksFlags & ((uint64_t) 1 << i))) {
+    if (!(receivedTrunksFlags & ((uint64_t)1 << i))) {
       *txFlags &= ~OP_IMG_REQTRUNKSEQ_MASK;
       *txFlags |= i;
       break;
@@ -203,7 +203,9 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
         trunkSize = rxdlf->GetPayloadSize() - rxStateLength - MSG_INFO_SIZE - 1;
         if (trunkSize > 0) {
           imgTrunkPtr = rxStatePtr + rxStateLength + 1;
-          if (msgInfo & IMG_FIRST_TRUNK_FLAG) {
+          int lastReqTrunkSeq = *txFlags & OP_IMG_REQTRUNKSEQ_MASK;
+          bool firstTrunk, lastTrunk;
+          if (firstTrunk = msgInfo & IMG_FIRST_TRUNK_FLAG) {
             baseTrunkSize = trunkSize;
             baseTrunkSizeSet = true;
           }
@@ -213,10 +215,30 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
             _MarkImgTrunk(receivedImgTrunkSeq);
             _UpdateTrunkSeq();
           }
-          if (msgInfo & IMG_LAST_TRUNK_FLAG) {
+          if (lastTrunk = msgInfo & IMG_LAST_TRUNK_FLAG) {
             lastTrunkReceived = true;
             lastTrunkSize = trunkSize;
             _MarkLastImgTrunk(receivedImgTrunkSeq);
+          }
+          if (firstTrunk) {
+            if (lastTrunk) {
+              Log->info(
+                  "RX FIRSTLAST TRUNK {} ; IMSEQ {} (E. {}) ; SEQ {} (E. {})",
+                  trunkSize, receivedImgSeq, imgSeq, receivedImgTrunkSeq,
+                  lastReqTrunkSeq);
+            } else {
+              Log->info("RX FIRST TRUNK {} ; IMSEQ {} (E. {}) ; SEQ {} (E. {})",
+                        trunkSize, receivedImgSeq, imgSeq, receivedImgTrunkSeq,
+                        lastReqTrunkSeq);
+            }
+          } else if (lastTrunk) {
+            Log->info("RX LAST TRUNK {} ; IMSEQ {} (E. {}) ; SEQ {} (E. {})",
+                      trunkSize, receivedImgSeq, imgSeq, receivedImgTrunkSeq,
+                      lastReqTrunkSeq);
+          } else {
+            Log->info("RX INTER TRUNK {} ; IMSEQ {} (E. {}) ; SEQ {} (E. {})",
+                      trunkSize, receivedImgSeq, imgSeq, receivedImgTrunkSeq,
+                      lastReqTrunkSeq);
           }
           if (lastTrunkReceived) {
             int ntrunks = _ImgReceptionCompleted();
@@ -246,6 +268,8 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
               _UpdateTrunkSeq();
             }
           }
+        } else {
+          Log->info("RX NO IMG");
         }
       }
     } else {
