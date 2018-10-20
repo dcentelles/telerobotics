@@ -42,6 +42,7 @@ ROV::ROV() : _commsWorker(this), _holdChannelCommsWorker(this) {
   SetLogName("ROV");
   _txStateSet = false;
   SetEnsureImgDelivery(true);
+  _cancelLastImage = false;
 }
 
 ROV::~ROV() {
@@ -109,6 +110,8 @@ bool ROV::SendingCurrentImage() { return _imgInBuffer; }
 
 void ROV::CancelLastImage() {
   std::unique_lock<std::mutex> lock(_immutex);
+  Log->warn("CANCEL LAST IMAGE");
+  _cancelLastImage = true;
   _ReinitImageFlags();
 }
 
@@ -147,10 +150,15 @@ void ROV::_WaitForNewOrders() {
       return;
     }
     int reqImgSeq = _GetRequestedImgSeq();
+    if (_LastImageCancelled()) {
+      Log->warn("LAST IMAGE CANCELLED");
+      _cancelLastImage = false;
+    }
     Log->info("RX IMSEQ {} (L. {})", reqImgSeq, lastImgSeq);
     if (lastImgSeq !=
-        reqImgSeq) // This means last image was successfully received
+        reqImgSeq) { // This means last image was successfully received
       _ReinitImageFlags();
+    }
     _rxStateLength = psize - 1;
     _UpdateCurrentRxStateFromRxState();
     _ordersReceivedCallback(*this);
@@ -160,6 +168,8 @@ void ROV::_WaitForNewOrders() {
 }
 
 int ROV::_GetRequestedImgSeq() { return *_rxflags & OP_IMG_SEQ ? 1 : 0; }
+
+bool ROV::_LastImageCancelled() { return *_rxflags & OP_IMG_CANCEL; }
 
 int ROV::_GetRequestedImgTrunkSeq() {
   return *_rxflags & OP_IMG_REQTRUNKSEQ_MASK;
@@ -254,69 +264,56 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
 
     int payloadSize = 0;
     int nextTrunkLength = 0;
-    if (_ensureDelivery) {
-      trunkFlags |= IMG_ENSURE_DELIVERY;
-      auto reqImgTrunkSeq = _GetRequestedImgTrunkSeq();
-      auto imgTrunkSeq = reqImgTrunkSeq;
-      int imgSize = _endImgPtr - _beginImgPtr;
-      // check if requested sequence number is possible
-      int imgPrefix = _imgTrunkLength * imgTrunkSeq;
-      if (imgPrefix >= imgSize) {
-        // if not, we send the last trunk. This will notify the receiver that
-        // he was requesting a trunk sequence soo high (this may happen if the
-        // image
-        // size is reduced)
-        imgTrunkSeq = imgSize / _imgTrunkLength;
-        if (imgTrunkSeq * _imgTrunkLength == imgSize)
-          imgTrunkSeq -= 1;
-      }
 
-      uint8_t *imgTrunkPtr = imgTrunkSeq * _imgTrunkLength + _beginImgPtr;
+    *_imgTrunkPtr = 0;
 
-      if (_imgInBuffer) {
-
-        int bytesLeft = _endImgPtr - imgTrunkPtr;
-        if (bytesLeft > _imgTrunkLength)
-          nextTrunkLength = _imgTrunkLength;
-        else {
-          trunkFlags |= IMG_LAST_TRUNK_FLAG;
-          nextTrunkLength = bytesLeft;
-        }
-        if (imgTrunkSeq == 0) {
-          trunkFlags |= IMG_FIRST_TRUNK_FLAG;
-        }
-        Log->info("TX IMGSIZE {} : IMGSEQ {} (R. {}) : TSIZE {}", imgSize,
-                  imgTrunkSeq, reqImgTrunkSeq, nextTrunkLength);
-
-        memcpy(_imgTrunkPtr + 1, imgTrunkPtr, nextTrunkLength);
-
-        *_imgTrunkPtr = 0;
-        *_imgTrunkPtr = 0 | (_GetRequestedImgSeq() ? IMG_SEQ : 0);
-        *_imgTrunkPtr |= IMG_TRUNK_SEQ_MASK & imgTrunkSeq;
-      }
-      payloadSize =
-          MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() + 1 + nextTrunkLength;
-
+    if (_cancelLastImage) {
+      Log->info("SET CANCEL IMG FLAG");
+      *_imgTrunkPtr |= IMG_CANCEL;
     } else {
-      int bytesLeft = _endImgPtr - _currentImgPtr;
-
-      if (bytesLeft > 0) // == (ImgInBuffer == True)
-      {
-        if (bytesLeft > _imgTrunkLength) {
-          nextTrunkLength = _imgTrunkLength;
-        } else {
-          trunkFlags |= IMG_LAST_TRUNK_FLAG;
-          nextTrunkLength = bytesLeft;
-        }
-        if (_beginImgPtr == _currentImgPtr)
-          trunkFlags |= IMG_FIRST_TRUNK_FLAG;
-
-        memcpy(_imgTrunkPtr, _currentImgPtr, nextTrunkLength);
-        _currentImgPtr += nextTrunkLength;
-      }
-      payloadSize =
-          MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() + nextTrunkLength;
+      *_imgTrunkPtr &= ~IMG_CANCEL;
     }
+
+    int reqImgTrunkSeq;
+    reqImgTrunkSeq = _GetRequestedImgTrunkSeq();
+    auto imgTrunkSeq = reqImgTrunkSeq;
+    int imgSize = _endImgPtr - _beginImgPtr;
+    // check if requested sequence number is possible
+    int imgPrefix = _imgTrunkLength * imgTrunkSeq;
+    if (imgPrefix >= imgSize) {
+      // if not, we send the last trunk. This will notify the receiver that
+      // he was requesting a trunk sequence soo high (this may happen if the
+      // image
+      // size is reduced)
+      imgTrunkSeq = imgSize / _imgTrunkLength;
+      if (imgTrunkSeq * _imgTrunkLength == imgSize)
+        imgTrunkSeq -= 1;
+    }
+
+    uint8_t *imgTrunkPtr = imgTrunkSeq * _imgTrunkLength + _beginImgPtr;
+
+    if (_imgInBuffer) {
+
+      int bytesLeft = _endImgPtr - imgTrunkPtr;
+      if (bytesLeft > _imgTrunkLength)
+        nextTrunkLength = _imgTrunkLength;
+      else {
+        trunkFlags |= IMG_LAST_TRUNK_FLAG;
+        nextTrunkLength = bytesLeft;
+      }
+      if (imgTrunkSeq == 0) {
+        trunkFlags |= IMG_FIRST_TRUNK_FLAG;
+      }
+      Log->info("TX IMGSIZE {} : IMGSEQ {} (R. {}) : TSIZE {}", imgSize,
+                imgTrunkSeq, reqImgTrunkSeq, nextTrunkLength);
+
+      memcpy(_imgTrunkPtr + 1, imgTrunkPtr, nextTrunkLength);
+
+      *_imgTrunkPtr |= (_GetRequestedImgSeq() ? IMG_SEQ : 0);
+      *_imgTrunkPtr |= IMG_TRUNK_SEQ_MASK & imgTrunkSeq;
+    }
+    payloadSize =
+        MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() + 1 + nextTrunkLength;
 
     _UpdateTrunkFlagsOnMsgInfo(trunkFlags);
     _txdlf->PayloadUpdated(payloadSize);

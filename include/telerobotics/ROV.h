@@ -72,6 +72,7 @@ private:
   uint8_t _GetTxStateSizeFromMsgInfo();
   int _GetRequestedImgSeq();
   int _GetRequestedImgTrunkSeq();
+  bool _LastImageCancelled();
 
   bool _holdChannel, _ensureDelivery;
   std::mutex _holdChannel_mutex;
@@ -119,6 +120,7 @@ private:
   Timer _rxtimer;
 
   bool _txStateSet;
+  bool _cancelLastImage;
 };
 
 } /* namespace dcauv */

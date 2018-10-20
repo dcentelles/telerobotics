@@ -50,6 +50,7 @@ Operator::Operator() : txservice(this), rxservice(this) {
 
   desiredStateSet = false;
   _canTransmit = true;
+  cancelling = false;
 }
 
 Operator::~Operator() {
@@ -172,9 +173,9 @@ void Operator::_ChangeImgSeq() {
 }
 
 void Operator::_UpdateTrunkSeq() {
+  *txFlags &= ~OP_IMG_REQTRUNKSEQ_MASK;
   for (uint64_t i = 0; i < 64; i++) {
     if (!(receivedTrunksFlags & ((uint64_t)1 << i))) {
-      *txFlags &= ~OP_IMG_REQTRUNKSEQ_MASK;
       *txFlags |= i;
       break;
     }
@@ -193,13 +194,25 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
 
     _UpdateLastConfirmedStateFromLastMsg();
 
-    bool ensureImgReception = msgInfo & IMG_ENSURE_DELIVERY;
-    if (ensureImgReception) {
-      int receivedImgSeq = *(rxStatePtr + rxStateLength) & IMG_SEQ ? 1 : 0;
+    uint8_t *rxTrunkInfo = rxStatePtr + rxStateLength;
+    if (*rxTrunkInfo & IMG_CANCEL) {
+      Log->info("CANCEL LAST RECEIVED IMG");
+      // Reinit image slots
+      if (!cancelling) {
+        Log->info("CANCELLING...");
+        receivedTrunksFlags = 0;
+        _UpdateTrunkSeq();
+        _ChangeImgSeq();
+        *txFlags |= OP_IMG_CANCEL;
+        cancelling = true;
+      }
+    } else {
+      cancelling = false;
+      *txFlags &= ~OP_IMG_CANCEL;
+      int receivedImgSeq = *rxTrunkInfo & IMG_SEQ ? 1 : 0;
       int imgSeq = _GetReqImgSeq();
       if (imgSeq == receivedImgSeq) {
-        int receivedImgTrunkSeq =
-            *(rxStatePtr + rxStateLength) & IMG_TRUNK_SEQ_MASK;
+        int receivedImgTrunkSeq = *rxTrunkInfo & IMG_TRUNK_SEQ_MASK;
         trunkSize = rxdlf->GetPayloadSize() - rxStateLength - MSG_INFO_SIZE - 1;
         if (trunkSize > 0) {
           imgTrunkPtr = rxStatePtr + rxStateLength + 1;
@@ -272,12 +285,6 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
           Log->info("RX NO IMG");
         }
       }
-    } else {
-      trunkSize = rxdlf->GetPayloadSize() - rxStateLength - MSG_INFO_SIZE;
-
-      imgTrunkPtr = rxStatePtr + rxStateLength;
-
-      _UpdateImgBufferFromLastMsg();
     }
     stateReceivedCallback(*this);
   } else {

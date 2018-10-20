@@ -115,6 +115,7 @@ private:
   int lastTrunkReceived = false;
   int lastTrunkSize = 0;
   uint64_t receivedTrunksFlags = 0;
+  bool cancelling;
 };
 
 } /* namespace dcauv */
