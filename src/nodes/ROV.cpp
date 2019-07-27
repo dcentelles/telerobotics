@@ -317,6 +317,8 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
 
     _UpdateTrunkFlagsOnMsgInfo(trunkFlags);
     _txdlf->PayloadUpdated(payloadSize);
+    _txdlf->SetSrcAddr(1);
+    _txdlf->SetDestAddr(2);
     _txdlf->UpdateFCS();
     Log->info("TX PKT {}", _txdlf->GetPacketSize());
     *_comms << _txdlf;

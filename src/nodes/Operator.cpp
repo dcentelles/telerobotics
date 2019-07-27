@@ -126,7 +126,7 @@ void Operator::_TxWork() {
   if (_canTransmit) {
     _SendPacketWithDesiredState();
     auto lastPktSize = txdlf->GetPacketSize();
-    auto nanos = (uint32_t)(lastPktSize * 8 / 200. * 1e9);
+    auto nanos = (uint32_t)(lastPktSize * 8 / 50. * 1e9);
     std::this_thread::sleep_for(chrono::nanoseconds(nanos));
   } else
     std::this_thread::sleep_for(chrono::milliseconds(50));
@@ -360,6 +360,8 @@ void Operator::_SendPacketWithDesiredState() {
       txstatemutex.unlock();
 
       txdlf->PayloadUpdated(1 + txStateLength);
+      txdlf->SetSrcAddr(2);
+      txdlf->SetDestAddr(1);
       txdlf->UpdateFCS();
       Log->info("TX PKT {}", txdlf->GetPacketSize());
       *_comms << txdlf;
