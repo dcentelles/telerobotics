@@ -116,6 +116,7 @@ private:
   int lastTrunkSize = 0;
   uint64_t receivedTrunksFlags = 0;
   bool cancelling;
+  uint32_t _pktSeq;
 };
 
 } /* namespace dcauv */

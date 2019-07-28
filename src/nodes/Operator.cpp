@@ -51,6 +51,7 @@ Operator::Operator() : txservice(this), rxservice(this) {
   desiredStateSet = false;
   _canTransmit = true;
   cancelling = false;
+  _pktSeq = 0;
 }
 
 Operator::~Operator() {
@@ -187,106 +188,116 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
   Log->debug("RX: waiting for frames...");
   *_comms >> rxdlf;
   if (rxdlf->PacketIsOk()) {
-    Log->info("RX PKT {}", rxdlf->GetPacketSize());
+    auto srcAddr = rxdlf->GetSrcAddr();
+    Log->info("RX FROM {} SEQ {} SIZE {}", srcAddr, rxdlf->GetSeq(),
+              rxdlf->GetPacketSize());
+    if (srcAddr == 1) {
+      Log->info("RX PKT {}", rxdlf->GetPacketSize());
 
-    msgInfo = *rxMsgInfoPtr;
-    rxStateLength = _GetStateSize(msgInfo);
+      msgInfo = *rxMsgInfoPtr;
+      rxStateLength = _GetStateSize(msgInfo);
 
-    _UpdateLastConfirmedStateFromLastMsg();
+      _UpdateLastConfirmedStateFromLastMsg();
 
-    uint8_t *rxTrunkInfo = rxStatePtr + rxStateLength;
-    if (*rxTrunkInfo & IMG_CANCEL) {
-      Log->info("CANCEL LAST RECEIVED IMG");
-      // Reinit image slots
-      if (!cancelling) {
-        Log->info("CANCELLING...");
-        receivedTrunksFlags = 0;
-        _UpdateTrunkSeq();
-        _ChangeImgSeq();
-        *txFlags |= OP_IMG_CANCEL;
-        cancelling = true;
-      }
-    } else {
-      cancelling = false;
-      *txFlags &= ~OP_IMG_CANCEL;
-      int receivedImgSeq = *rxTrunkInfo & IMG_SEQ ? 1 : 0;
-      int imgSeq = _GetReqImgSeq();
-      if (imgSeq == receivedImgSeq) {
-        int receivedImgTrunkSeq = *rxTrunkInfo & IMG_TRUNK_SEQ_MASK;
-        trunkSize = rxdlf->GetPayloadSize() - rxStateLength - MSG_INFO_SIZE - 1;
-        if (trunkSize > 0) {
-          imgTrunkPtr = rxStatePtr + rxStateLength + 1;
-          int lastReqTrunkSeq = *txFlags & OP_IMG_REQTRUNKSEQ_MASK;
-          bool firstTrunk, lastTrunk;
-          if (firstTrunk = msgInfo & IMG_FIRST_TRUNK_FLAG) {
-            baseTrunkSize = trunkSize;
-            baseTrunkSizeSet = true;
-          }
-          if (baseTrunkSizeSet) {
-            memcpy(beginImgPtr + (receivedImgTrunkSeq * baseTrunkSize),
-                   imgTrunkPtr, trunkSize);
-            _MarkImgTrunk(receivedImgTrunkSeq);
-            _UpdateTrunkSeq();
-          }
-          if (lastTrunk = msgInfo & IMG_LAST_TRUNK_FLAG) {
-            lastTrunkReceived = true;
-            lastTrunkSize = trunkSize;
-            _MarkLastImgTrunk(receivedImgTrunkSeq);
-          }
-          if (firstTrunk) {
-            if (lastTrunk) {
-              Log->info(
-                  "RX FIRSTLAST TRUNK {} ; IMSEQ {} (E. {}) ; SEQ {} (E. {})",
-                  trunkSize, receivedImgSeq, imgSeq, receivedImgTrunkSeq,
-                  lastReqTrunkSeq);
+      uint8_t *rxTrunkInfo = rxStatePtr + rxStateLength;
+      if (*rxTrunkInfo & IMG_CANCEL) {
+        Log->info("CANCEL LAST RECEIVED IMG");
+        // Reinit image slots
+        if (!cancelling) {
+          Log->info("CANCELLING...");
+          receivedTrunksFlags = 0;
+          _UpdateTrunkSeq();
+          _ChangeImgSeq();
+          *txFlags |= OP_IMG_CANCEL;
+          cancelling = true;
+        }
+      } else {
+        cancelling = false;
+        *txFlags &= ~OP_IMG_CANCEL;
+        int receivedImgSeq = *rxTrunkInfo & IMG_SEQ ? 1 : 0;
+        int imgSeq = _GetReqImgSeq();
+        if (imgSeq == receivedImgSeq) {
+          int receivedImgTrunkSeq = *rxTrunkInfo & IMG_TRUNK_SEQ_MASK;
+          trunkSize =
+              rxdlf->GetPayloadSize() - rxStateLength - MSG_INFO_SIZE - 1;
+          if (trunkSize > 0) {
+            imgTrunkPtr = rxStatePtr + rxStateLength + 1;
+            int lastReqTrunkSeq = *txFlags & OP_IMG_REQTRUNKSEQ_MASK;
+            bool firstTrunk, lastTrunk;
+            if (firstTrunk = msgInfo & IMG_FIRST_TRUNK_FLAG) {
+              baseTrunkSize = trunkSize;
+              baseTrunkSizeSet = true;
+            }
+            if (baseTrunkSizeSet) {
+              memcpy(beginImgPtr + (receivedImgTrunkSeq * baseTrunkSize),
+                     imgTrunkPtr, trunkSize);
+              _MarkImgTrunk(receivedImgTrunkSeq);
+              _UpdateTrunkSeq();
+            }
+            if (lastTrunk = msgInfo & IMG_LAST_TRUNK_FLAG) {
+              lastTrunkReceived = true;
+              lastTrunkSize = trunkSize;
+              _MarkLastImgTrunk(receivedImgTrunkSeq);
+            }
+            if (firstTrunk) {
+              if (lastTrunk) {
+                Log->info(
+                    "RX FIRSTLAST TRUNK {} ; IMSEQ {} (E. {}) ; SEQ {} (E. {})",
+                    trunkSize, receivedImgSeq, imgSeq, receivedImgTrunkSeq,
+                    lastReqTrunkSeq);
+              } else {
+                Log->info(
+                    "RX FIRST TRUNK {} ; IMSEQ {} (E. {}) ; SEQ {} (E. {})",
+                    trunkSize, receivedImgSeq, imgSeq, receivedImgTrunkSeq,
+                    lastReqTrunkSeq);
+              }
+            } else if (lastTrunk) {
+              Log->info("RX LAST TRUNK {} ; IMSEQ {} (E. {}) ; SEQ {} (E. {})",
+                        trunkSize, receivedImgSeq, imgSeq, receivedImgTrunkSeq,
+                        lastReqTrunkSeq);
             } else {
-              Log->info("RX FIRST TRUNK {} ; IMSEQ {} (E. {}) ; SEQ {} (E. {})",
+              Log->info("RX INTER TRUNK {} ; IMSEQ {} (E. {}) ; SEQ {} (E. {})",
                         trunkSize, receivedImgSeq, imgSeq, receivedImgTrunkSeq,
                         lastReqTrunkSeq);
             }
-          } else if (lastTrunk) {
-            Log->info("RX LAST TRUNK {} ; IMSEQ {} (E. {}) ; SEQ {} (E. {})",
-                      trunkSize, receivedImgSeq, imgSeq, receivedImgTrunkSeq,
-                      lastReqTrunkSeq);
-          } else {
-            Log->info("RX INTER TRUNK {} ; IMSEQ {} (E. {}) ; SEQ {} (E. {})",
-                      trunkSize, receivedImgSeq, imgSeq, receivedImgTrunkSeq,
-                      lastReqTrunkSeq);
-          }
-          if (lastTrunkReceived) {
-            int ntrunks = _ImgReceptionCompleted();
-            if (ntrunks > 0) {
-              int blockSize = (ntrunks - 1) * baseTrunkSize + lastTrunkSize;
-              uint16_t crc = Checksum::crc16(beginImgPtr, blockSize);
-              if (crc == 0) {
-                immutex.lock();
-                lastImgSize = blockSize - IMG_CHKSUM_SIZE;
-                Log->info("RX IMG {}", lastImgSize);
-                memcpy(beginImgPtr, beginImgPtr, lastImgSize);
-                immutex.unlock();
+            if (lastTrunkReceived) {
+              int ntrunks = _ImgReceptionCompleted();
+              if (ntrunks > 0) {
+                int blockSize = (ntrunks - 1) * baseTrunkSize + lastTrunkSize;
+                uint16_t crc = Checksum::crc16(beginImgPtr, blockSize);
+                if (crc == 0) {
+                  immutex.lock();
+                  lastImgSize = blockSize - IMG_CHKSUM_SIZE;
+                  Log->info("RX IMG {}", lastImgSize);
+                  memcpy(beginImgPtr, beginImgPtr, lastImgSize);
+                  immutex.unlock();
 
-                imageReceivedCallback(*this);
-              } else {
-                Log->warn("ERROR ON DECODING IMAGE. THIS CAN ONLY HAVE "
-                          "HAPPENED IF THE SIZE OF THE IMAGE HAS CHANGED. "
-                          "RESETTING TRUNK FLAGS... {}",
-                          lastImgSize);
+                  imageReceivedCallback(*this);
+                } else {
+                  Log->warn("ERROR ON DECODING IMAGE. THIS CAN ONLY HAVE "
+                            "HAPPENED IF THE SIZE OF THE IMAGE HAS CHANGED. "
+                            "RESETTING TRUNK FLAGS... {}",
+                            lastImgSize);
+                }
+                baseTrunkSizeSet = false;
+                baseTrunkSize = 0;
+                lastTrunkReceived = false;
+                lastTrunkSize = 0;
+                receivedTrunksFlags = 0;
+                _ChangeImgSeq();
+                _UpdateTrunkSeq();
               }
-              baseTrunkSizeSet = false;
-              baseTrunkSize = 0;
-              lastTrunkReceived = false;
-              lastTrunkSize = 0;
-              receivedTrunksFlags = 0;
-              _ChangeImgSeq();
-              _UpdateTrunkSeq();
             }
+          } else {
+            Log->info("RX NO IMG");
           }
-        } else {
-          Log->info("RX NO IMG");
         }
       }
+      stateReceivedCallback(*this);
+    } else {
+      // Data packet received from another node
     }
-    stateReceivedCallback(*this);
+
   } else {
     Log->warn("ERR PKT {}", rxdlf->GetPacketSize());
   }
@@ -362,8 +373,10 @@ void Operator::_SendPacketWithDesiredState() {
       txdlf->PayloadUpdated(1 + txStateLength);
       txdlf->SetSrcAddr(2);
       txdlf->SetDestAddr(1);
+      txdlf->SetSeq(_pktSeq++);
       txdlf->UpdateFCS();
-      Log->info("TX PKT {}", txdlf->GetPacketSize());
+      Log->info("TX TO 0 SEQ {} SIZE {}", txdlf->GetSeq(),
+                txdlf->GetPacketSize());
       *_comms << txdlf;
       while (_comms->BusyTransmitting())
         ;
@@ -380,4 +393,4 @@ void Operator::_UpdateLastConfirmedStateFromLastMsg() {
   rxstatemutex.unlock();
 }
 
-} /* namespace dcauv */
+} // namespace telerobotics

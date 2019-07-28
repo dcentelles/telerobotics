@@ -121,6 +121,7 @@ private:
 
   bool _txStateSet;
   bool _cancelLastImage;
+  uint32_t _pktSeq;
 };
 
 } /* namespace dcauv */

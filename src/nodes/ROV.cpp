@@ -43,6 +43,7 @@ ROV::ROV() : _commsWorker(this), _holdChannelCommsWorker(this) {
   _txStateSet = false;
   SetEnsureImgDelivery(true);
   _cancelLastImage = false;
+  _pktSeq = 0;
 }
 
 ROV::~ROV() {
@@ -142,26 +143,30 @@ void ROV::_WaitForNewOrders() {
   int lastImgSeq = _GetRequestedImgSeq();
   _comms >> _rxdlf;
   if (_rxdlf->PacketIsOk()) {
-    Log->info("RX PKT {}", _rxdlf->GetPacketSize());
-    auto psize = _rxdlf->GetPayloadSize();
-    if (psize < 1) {
-      Log->critical(
-          "rx payload must be greater than 1 (first byte = rx flags)");
-      return;
+    auto srcAddr = _rxdlf->GetSrcAddr();
+    Log->info("RX FROM {} SEQ {} SIZE {}", srcAddr, _rxdlf->GetSeq(),
+              _rxdlf->GetPacketSize());
+    if (srcAddr == 2) {
+      auto psize = _rxdlf->GetPayloadSize();
+      if (psize < 1) {
+        Log->critical(
+            "rx payload must be greater than 1 (first byte = rx flags)");
+        return;
+      }
+      int reqImgSeq = _GetRequestedImgSeq();
+      if (_LastImageCancelled()) {
+        Log->warn("LAST IMAGE CANCELLED");
+        _cancelLastImage = false;
+      }
+      Log->info("RX IMSEQ {} (L. {})", reqImgSeq, lastImgSeq);
+      if (lastImgSeq !=
+          reqImgSeq) { // This means last image was successfully received
+        _ReinitImageFlags();
+      }
+      _rxStateLength = psize - 1;
+      _UpdateCurrentRxStateFromRxState();
+      _ordersReceivedCallback(*this);
     }
-    int reqImgSeq = _GetRequestedImgSeq();
-    if (_LastImageCancelled()) {
-      Log->warn("LAST IMAGE CANCELLED");
-      _cancelLastImage = false;
-    }
-    Log->info("RX IMSEQ {} (L. {})", reqImgSeq, lastImgSeq);
-    if (lastImgSeq !=
-        reqImgSeq) { // This means last image was successfully received
-      _ReinitImageFlags();
-    }
-    _rxStateLength = psize - 1;
-    _UpdateCurrentRxStateFromRxState();
-    _ordersReceivedCallback(*this);
   } else {
     Log->warn("ERR PKT {}", _rxdlf->GetPacketSize());
   }
@@ -319,8 +324,10 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
     _txdlf->PayloadUpdated(payloadSize);
     _txdlf->SetSrcAddr(1);
     _txdlf->SetDestAddr(2);
+    _txdlf->SetSeq(_pktSeq++);
     _txdlf->UpdateFCS();
-    Log->info("TX PKT {}", _txdlf->GetPacketSize());
+    Log->info("TX TO 0 SEQ {} SIZE {}", _txdlf->GetSeq(),
+              _txdlf->GetPacketSize());
     *_comms << _txdlf;
     if (block) {
       auto lastPktSize = _txdlf->GetPacketSize();
@@ -350,4 +357,4 @@ void ROV::_CheckIfEntireImgIsSent() {
 
 void ROV::_SetEndianess() { _bigEndian = DataLinkFrame::IsBigEndian(); }
 
-} /* namespace dcauv */
+} // namespace telerobotics
