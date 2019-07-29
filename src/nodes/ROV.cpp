@@ -326,7 +326,7 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
     _txdlf->SetDestAddr(2);
     _txdlf->SetSeq(_pktSeq++);
     _txdlf->UpdateFCS();
-    Log->info("TX TO 0 SEQ {} SIZE {}", _txdlf->GetSeq(),
+    Log->info("TX TO 2 SEQ {} SIZE {}", _txdlf->GetSeq(),
               _txdlf->GetPacketSize());
     *_comms << _txdlf;
     if (block) {

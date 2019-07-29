@@ -375,7 +375,7 @@ void Operator::_SendPacketWithDesiredState() {
       txdlf->SetDestAddr(1);
       txdlf->SetSeq(_pktSeq++);
       txdlf->UpdateFCS();
-      Log->info("TX TO 0 SEQ {} SIZE {}", txdlf->GetSeq(),
+      Log->info("TX TO 1 SEQ {} SIZE {}", txdlf->GetSeq(),
                 txdlf->GetPacketSize());
       *_comms << txdlf;
       while (_comms->BusyTransmitting())
