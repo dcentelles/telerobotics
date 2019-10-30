@@ -4,9 +4,9 @@
 #include <cpplogging/cpplogging.h>
 #include <dccomms/CommsDeviceService.h>
 #include <dccomms/DataLinkFrame.h>
-#include <dccomms/TransportPDU.h>
 #include <dccomms/Utils.h>
 #include <mutex>
+#include <telerobotics/TransportPDU.h>
 
 namespace telerobotics {
 
@@ -53,5 +53,5 @@ private:
   void _Work();
   void _SendPacket();
 };
-}
+} // namespace telerobotics
 #endif // STATESENDER_H

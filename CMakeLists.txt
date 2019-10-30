@@ -93,12 +93,11 @@ SET(${PROJECT_NAME}_INCLUDE_DIRS
     )
 
 SET(${PROJECT_NAME}_CPP_FILES
-                        src/nodes/ROVCamera.cpp
-                        src/nodes/ROVOperator.cpp
                         src/nodes/StateSender.cpp
                         src/nodes/StateReceiver.cpp
                         src/nodes/Operator.cpp
                         src/nodes/ROV.cpp
+                        src/packets/TransportPDU.cpp
                         src/msgs/HROVSettings.cpp
                         src/msgs/HROVSettingsV2.cpp
                         src/msgs/HROVMoveOrder.cpp

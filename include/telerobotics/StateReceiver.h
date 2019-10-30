@@ -4,9 +4,9 @@
 #include <cpplogging/cpplogging.h>
 #include <dccomms/CommsDeviceService.h>
 #include <dccomms/DataLinkFrame.h>
-#include <dccomms/TransportPDU.h>
 #include <dccomms/Utils.h>
 #include <mutex>
+#include <telerobotics/TransportPDU.h>
 
 namespace telerobotics {
 
@@ -50,6 +50,6 @@ private:
   int _maxPacketLength;
   void _Work();
 };
-}
+} // namespace telerobotics
 
 #endif // STATERECEIVER_H
