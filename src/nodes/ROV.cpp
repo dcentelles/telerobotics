@@ -142,8 +142,8 @@ void ROV::Start() {
 void ROV::_WaitForNewOrders() {
   int lastImgSeq = _GetRequestedImgSeq();
   _comms >> _rxdlf;
-  if (_rxdlf->PacketIsOk()) {
-    auto srcAddr = _rxdlf->GetSrcAddr();
+  if (_rxdlf->IsOk()) {
+    auto srcAddr = _rxdlf->GetSrc();
     Log->info("RX FROM {} SEQ {} SIZE {}", srcAddr, _rxdlf->GetSeq(),
               _rxdlf->GetPacketSize());
     if (srcAddr == 2) {
@@ -322,8 +322,8 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
 
     _UpdateTrunkFlagsOnMsgInfo(trunkFlags);
     _txdlf->PayloadUpdated(payloadSize);
-    _txdlf->SetSrcAddr(1);
-    _txdlf->SetDestAddr(2);
+    _txdlf->SetSrc(1);
+    _txdlf->SetDst(2);
     _txdlf->SetSeq(_pktSeq++);
     _txdlf->UpdateFCS();
     Log->info("TX TO 2 SEQ {} SIZE {}", _txdlf->GetSeq(),

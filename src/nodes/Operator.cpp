@@ -187,8 +187,8 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
   // Wait for the next packet and call the callback
   Log->debug("RX: waiting for frames...");
   *_comms >> rxdlf;
-  if (rxdlf->PacketIsOk()) {
-    auto srcAddr = rxdlf->GetSrcAddr();
+  if (rxdlf->IsOk()) {
+    auto srcAddr = rxdlf->GetSrc();
     Log->info("RX FROM {} SEQ {} SIZE {}", srcAddr, rxdlf->GetSeq(),
               rxdlf->GetPacketSize());
     if (srcAddr == 1) {
@@ -371,8 +371,8 @@ void Operator::_SendPacketWithDesiredState() {
       txstatemutex.unlock();
 
       txdlf->PayloadUpdated(1 + txStateLength);
-      txdlf->SetSrcAddr(2);
-      txdlf->SetDestAddr(1);
+      txdlf->SetSrc(2);
+      txdlf->SetDst(1);
       txdlf->SetSeq(_pktSeq++);
       txdlf->UpdateFCS();
       Log->info("TX TO 1 SEQ {} SIZE {}", txdlf->GetSeq(),
