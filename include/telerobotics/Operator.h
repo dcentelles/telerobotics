@@ -48,6 +48,7 @@ public:
   void Start();
   void DisableTransmission();
   void EnableTransmission();
+  void SetEnableSrcAddrCheck(bool enable);
 
 private:
   bool _canTransmit;
@@ -117,6 +118,7 @@ private:
   uint64_t receivedTrunksFlags = 0;
   bool cancelling;
   uint32_t _pktSeq;
+  bool _checkSrcAddr;
 };
 
 } /* namespace dcauv */

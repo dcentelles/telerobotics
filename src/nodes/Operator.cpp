@@ -52,6 +52,7 @@ Operator::Operator() : txservice(this), rxservice(this) {
   _canTransmit = true;
   cancelling = false;
   _pktSeq = 0;
+  _checkSrcAddr = true;
 }
 
 Operator::~Operator() {
@@ -61,6 +62,8 @@ Operator::~Operator() {
     rxservice.Stop();
   delete buffer;
 }
+
+void Operator::SetEnableSrcAddrCheck(bool enable) { _checkSrcAddr = enable; }
 
 void Operator::SetComms(Ptr<CommsDevice> comms) { _comms = comms; }
 
@@ -127,7 +130,7 @@ void Operator::_TxWork() {
   if (_canTransmit) {
     _SendPacketWithDesiredState();
     auto lastPktSize = txdlf->GetPacketSize();
-    auto nanos = (uint32_t)(lastPktSize * 8 / 50. * 1e9);
+    auto nanos = (uint32_t)(lastPktSize * 8 / 175. * 1e9);
     std::this_thread::sleep_for(chrono::nanoseconds(nanos));
   } else
     std::this_thread::sleep_for(chrono::milliseconds(50));
@@ -191,7 +194,7 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
     auto srcAddr = rxdlf->GetSrc();
     Log->info("RX FROM {} SEQ {} SIZE {}", srcAddr, rxdlf->GetSeq(),
               rxdlf->GetPacketSize());
-    if (srcAddr == 1) {
+    if (srcAddr == 1 || !_checkSrcAddr) {
       Log->info("RX PKT {}", rxdlf->GetPacketSize());
 
       msgInfo = *rxMsgInfoPtr;

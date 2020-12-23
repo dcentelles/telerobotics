@@ -44,6 +44,7 @@ ROV::ROV() : _commsWorker(this), _holdChannelCommsWorker(this) {
   SetEnsureImgDelivery(true);
   _cancelLastImage = false;
   _pktSeq = 0;
+  _checkSrcAddr = true;
 }
 
 ROV::~ROV() {
@@ -52,6 +53,8 @@ ROV::~ROV() {
     _commsWorker.Stop();
   delete _buffer;
 }
+
+void ROV::SetEnableSrcAddrCheck(bool enable) { _checkSrcAddr = enable; }
 
 void ROV::SetImageTrunkLength(int _len) {
   _len = _len <= MAX_IMG_TRUNK_LENGTH ? _len : MAX_IMG_TRUNK_LENGTH;
@@ -146,7 +149,7 @@ void ROV::_WaitForNewOrders() {
     auto srcAddr = _rxdlf->GetSrc();
     Log->info("RX FROM {} SEQ {} SIZE {}", srcAddr, _rxdlf->GetSeq(),
               _rxdlf->GetPacketSize());
-    if (srcAddr == 2) {
+    if (srcAddr == 2 || !_checkSrcAddr) {
       auto psize = _rxdlf->GetPayloadSize();
       if (psize < 1) {
         Log->critical(
@@ -351,7 +354,7 @@ void ROV::_CheckIfEntireImgIsSent() {
   if (!_ensureDelivery && _imgInBuffer && _currentImgPtr == _endImgPtr) {
     _ReinitImageFlags();
     _lastImageSentCallback(*this);
-    Log->debug("TX: image transmission completed");
+    Log->info("TX: image transmission completed");
   }
 }
 

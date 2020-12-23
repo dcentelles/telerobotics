@@ -54,6 +54,7 @@ public:
 
   void SetEnsureImgDelivery(bool v);
   bool EnsureDelivery();
+  void SetEnableSrcAddrCheck(bool enable);
 
 private:
   void _ReinitImageFlags();
@@ -122,6 +123,7 @@ private:
   bool _txStateSet;
   bool _cancelLastImage;
   uint32_t _pktSeq;
+  bool _checkSrcAddr;
 };
 
 } /* namespace dcauv */
