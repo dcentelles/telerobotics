@@ -67,6 +67,7 @@ void ROV::SetChecksumType(FCS fcs) { _dlfcrctype = fcs; }
 void ROV::SendImage(void *_buf, unsigned int _length) {
   // TODO: aply a hash to de img in order to check errors when reassembling
   // trunks
+  Log->info("TX IMG REQ");
   std::unique_lock<std::mutex> lock(_immutex);
   while (_imgInBuffer) {
     _imgInBufferCond.wait(lock);
@@ -74,7 +75,6 @@ void ROV::SendImage(void *_buf, unsigned int _length) {
   memcpy(_beginImgPtr, _buf, _length);
   _imgChksumPtr = (uint16_t *)(_beginImgPtr + _length);
   _endImgPtr = ((uint8_t *)_imgChksumPtr) + IMG_CHKSUM_SIZE;
-  _currentImgPtr = _beginImgPtr;
 
   uint16_t imgChksum = Checksum::crc16(_beginImgPtr, _length);
   if (_bigEndian) {
@@ -133,8 +133,7 @@ void ROV::Start() {
   _rxflags = _rxbuffer;
   _rxStatePtr = _rxflags + 1;
 
-  _currentImgPtr = _beginImgPtr; // No image in buffer
-  _endImgPtr = _currentImgPtr;   //
+  _endImgPtr = _beginImgPtr; // No image in buffer
 
   _holdChannel = false;
 
@@ -164,6 +163,8 @@ void ROV::_WaitForNewOrders() {
       Log->info("RX IMSEQ {} (L. {})", reqImgSeq, lastImgSeq);
       if (lastImgSeq !=
           reqImgSeq) { // This means last image was successfully received
+        Log->info("RX IMG OK");
+        _lastImageSentCallback(*this);
         _ReinitImageFlags();
       }
       _rxStateLength = psize - 1;
@@ -185,10 +186,8 @@ int ROV::_GetRequestedImgTrunkSeq() {
 
 void ROV::_Work() {
   _WaitForNewOrders();
-  _immutex.lock();
-  _SendPacketWithCurrentStateAndImgTrunk();
-  _CheckIfEntireImgIsSent();
-  _immutex.unlock();
+  std::unique_lock<std::mutex> lock(_immutex);
+  _SendPacketWithCurrentStateAndImgTrunk(lock);
 }
 
 void ROV::HoldChannel(bool v) {
@@ -196,6 +195,10 @@ void ROV::HoldChannel(bool v) {
   _ReinitImageFlags();
   _holdChannel = v;
   _holdChannel_cond.notify_one();
+  if (_holdChannel) {
+    _holdChannelImgSeq = _GetRequestedImgSeq();
+    _holdChannelImgTrunkSeq = _GetRequestedImgTrunkSeq();
+  }
   _immutex.unlock();
 }
 
@@ -209,8 +212,7 @@ void ROV::_HoldChannelWork() {
     _imgInBufferCond.wait(lock);
   }
   if (_holdChannel) {
-    _SendPacketWithCurrentStateAndImgTrunk(true);
-    _CheckIfEntireImgIsSent();
+    _SendPacketWithCurrentStateAndImgTrunk(lock, true);
   }
 }
 void ROV::_UpdateCurrentRxStateFromRxState() {
@@ -259,7 +261,8 @@ void ROV::SetEnsureImgDelivery(bool v) {
 
 bool ROV::EnsureDelivery() { return _ensureDelivery; }
 
-void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
+void ROV::_SendPacketWithCurrentStateAndImgTrunk(
+    std::unique_lock<std::mutex> &lock, bool block) {
   if (_comms->BusyTransmitting()) {
     if (!_holdChannel)
       Log->critical("TX: possible bug: device busy transmitting before next "
@@ -268,6 +271,10 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
   }
   uint8_t trunkFlags = 0;
   if (_txStateSet) {
+    if (!_imgInBuffer) {
+      Log->info("TX NO IMG IN BUFFER");
+      _imgInBufferCond.wait_for(lock, 100ms);
+    }
     _UpdateTxStateFromCurrentTxState();
 
     int payloadSize = 0;
@@ -283,7 +290,8 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
     }
 
     int reqImgTrunkSeq;
-    reqImgTrunkSeq = _GetRequestedImgTrunkSeq();
+    reqImgTrunkSeq =
+        _holdChannel ? _holdChannelImgTrunkSeq : _GetRequestedImgTrunkSeq();
     auto imgTrunkSeq = reqImgTrunkSeq;
     int imgSize = _endImgPtr - _beginImgPtr;
     // check if requested sequence number is possible
@@ -317,8 +325,25 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
 
       memcpy(_imgTrunkPtr + 1, imgTrunkPtr, nextTrunkLength);
 
-      *_imgTrunkPtr |= (_GetRequestedImgSeq() ? IMG_SEQ : 0);
+      if (!_holdChannel)
+        *_imgTrunkPtr |= (_GetRequestedImgSeq() ? IMG_SEQ : 0);
+      else
+        *_imgTrunkPtr |= (_holdChannelImgSeq ? IMG_SEQ : 0);
+
       *_imgTrunkPtr |= IMG_TRUNK_SEQ_MASK & imgTrunkSeq;
+
+      if (_holdChannel) {
+        if (trunkFlags & IMG_LAST_TRUNK_FLAG) {
+          _imgInBuffer = false;
+          _holdChannelImgSeq = _holdChannelImgSeq ? 0 : 1;
+          _endImgPtr = _beginImgPtr;
+          _lastImageSentCallback(*this);
+          _imgInBufferCond.notify_all();
+          _holdChannelImgTrunkSeq = 0;
+        } else {
+          _holdChannelImgTrunkSeq++;
+        }
+      }
     }
     payloadSize =
         MSG_INFO_SIZE + _GetTxStateSizeFromMsgInfo() + 1 + nextTrunkLength;
@@ -334,8 +359,10 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
     *_comms << _txdlf;
     if (block) {
       auto lastPktSize = _txdlf->GetPacketSize();
-      auto nanos = (uint32_t)(lastPktSize * 8 / 1850. * 1e9);
+      lock.unlock();
+      unsigned long nanos = lastPktSize * 8 / 1850. * 1e9;
       std::this_thread::sleep_for(chrono::nanoseconds(nanos));
+      lock.lock();
     }
   } else {
     Log->warn("TX: current state is not set yet");
@@ -345,17 +372,10 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(bool block) {
 
 void ROV::_ReinitImageFlags() {
   _imgInBuffer = false;
-  _currentImgPtr = _beginImgPtr;
-  _endImgPtr = _currentImgPtr;
+  _endImgPtr = _beginImgPtr;
+  _holdChannelImgTrunkSeq = 0;
+  _holdChannelImgSeq = 0;
   _imgInBufferCond.notify_all();
-}
-void ROV::_CheckIfEntireImgIsSent() {
-  // Check If it has been sent the last image trunk and call the callback
-  if (!_ensureDelivery && _imgInBuffer && _currentImgPtr == _endImgPtr) {
-    _ReinitImageFlags();
-    _lastImageSentCallback(*this);
-    Log->info("TX: image transmission completed");
-  }
 }
 
 void ROV::_SetEndianess() { _bigEndian = DataLinkFrame::IsBigEndian(); }

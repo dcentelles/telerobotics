@@ -59,9 +59,9 @@ public:
 private:
   void _ReinitImageFlags();
   void _WaitForNewOrders();
-  void _SendPacketWithCurrentStateAndImgTrunk(bool block = false);
-  void _CheckIfEntireImgIsSent();
-
+  void
+  _SendPacketWithCurrentStateAndImgTrunk(std::unique_lock<std::mutex> &lock,
+                                         bool block = false);
   void _UpdateCurrentRxStateFromRxState();
   void _UpdateTxStateFromCurrentTxState();
   void _SetEndianess();
@@ -102,7 +102,6 @@ private:
   uint8_t *_imgTrunkPtr;
 
   uint8_t *_beginImgPtr;
-  uint8_t *_currentImgPtr;
   uint16_t *_imgChksumPtr;
   uint8_t *_endImgPtr;
 
@@ -124,8 +123,9 @@ private:
   bool _cancelLastImage;
   uint32_t _pktSeq;
   bool _checkSrcAddr;
+  int _holdChannelImgTrunkSeq, _holdChannelImgSeq;
 };
 
-} /* namespace dcauv */
+} // namespace telerobotics
 
 #endif /* ROVCAMERA_H_ */
