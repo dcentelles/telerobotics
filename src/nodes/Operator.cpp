@@ -130,8 +130,15 @@ void Operator::_TxWork() {
   if (_canTransmit) {
     _SendPacketWithDesiredState();
     auto lastPktSize = txdlf->GetPacketSize();
-    auto nanos = (uint32_t)(lastPktSize * 8 / 175. * 1e9);
+    auto minPktDuration = 11;
+    unsigned long nanos;
+    if (lastPktSize >= minPktDuration) {
+      nanos = static_cast<unsigned long>((lastPktSize * 8 / 175. * 1e9));
+    } else {
+      nanos = static_cast<unsigned long>((minPktDuration * 8 / 175. * 1e9));
+    }
     std::this_thread::sleep_for(chrono::nanoseconds(nanos));
+
   } else
     std::this_thread::sleep_for(chrono::milliseconds(50));
 }
