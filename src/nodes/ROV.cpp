@@ -122,8 +122,8 @@ void ROV::CancelLastImage() {
 void ROV::SetComms(Ptr<CommsDevice> comms) { _comms = comms; }
 
 void ROV::Start() {
-  _txdlf = CreateObject<VariableLengthPacket>();
-  _rxdlf = CreateObject<VariableLengthPacket>();
+  _txdlf = CreateObject<WAFrame>();
+  _rxdlf = CreateObject<WAFrame>();
 
   _txbuffer = _txdlf->GetPayloadBuffer();
   _rxbuffer = _rxdlf->GetPayloadBuffer();

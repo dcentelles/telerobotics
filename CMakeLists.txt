@@ -98,6 +98,7 @@ SET(${PROJECT_NAME}_CPP_FILES
                         src/nodes/Operator.cpp
                         src/nodes/ROV.cpp
                         src/packets/TransportPDU.cpp
+                        src/packets/WAFrame.cpp
                         src/msgs/HROVSettings.cpp
                         src/msgs/HROVSettingsV2.cpp
                         src/msgs/HROVMoveOrder.cpp

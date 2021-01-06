@@ -10,7 +10,7 @@
 
 #include <cpplogging/Loggable.h>
 #include <dccomms/Utils.h>
-#include <dccomms_packets/VariableLengthPacket.h>
+#include <telerobotics/WAFrame.h>
 #include <functional>
 #include <iostream>
 #include <mutex>
@@ -62,8 +62,8 @@ private:
   uint16_t lastImgSize;
 
   Ptr<CommsDevice> _comms;
-  Ptr<VariableLengthPacket> txdlf;
-  Ptr<VariableLengthPacket> rxdlf;
+  Ptr<WAFrame> txdlf;
+  Ptr<WAFrame> rxdlf;
 
   ServiceThread<Operator> txservice;
   ServiceThread<Operator> rxservice;
@@ -119,6 +119,7 @@ private:
   bool cancelling;
   uint32_t _pktSeq;
   bool _checkSrcAddr;
+  bool _rxError = false;
 };
 
 } /* namespace dcauv */

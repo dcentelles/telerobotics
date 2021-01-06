@@ -11,7 +11,7 @@
 #include <condition_variable>
 #include <cpplogging/Loggable.h>
 #include <dccomms/Utils.h>
-#include <dccomms_packets/VariableLengthPacket.h>
+#include <telerobotics/WAFrame.h>
 #include <functional>
 #include <iostream>
 #include <mutex>
@@ -93,8 +93,8 @@ private:
 
   ServiceThread<ROV> _commsWorker, _holdChannelCommsWorker;
 
-  Ptr<VariableLengthPacket> _txdlf;
-  Ptr<VariableLengthPacket> _rxdlf;
+  Ptr<WAFrame> _txdlf;
+  Ptr<WAFrame> _rxdlf;
   //// TX /////
   uint8_t *_txbuffer;
   uint8_t *_txStatePtr;

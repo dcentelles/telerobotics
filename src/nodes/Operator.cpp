@@ -6,8 +6,8 @@
  */
 
 #include <dccomms/Checksum.h>
-#include <dccomms/DataLinkFrame.h>
 #include <telerobotics/Operator.h>
+#include <telerobotics/WAFrame.h>
 
 namespace telerobotics {
 
@@ -100,8 +100,8 @@ void Operator::SetStateReceivedCallback(f_notification _callback) {
 }
 
 void Operator::Start() {
-  txdlf = CreateObject<VariableLengthPacket>();
-  rxdlf = CreateObject<VariableLengthPacket>();
+  txdlf = CreateObject<WAFrame>();
+  rxdlf = CreateObject<WAFrame>();
 
   auto txdlbuffer = txdlf->GetPayloadBuffer();
   auto rxdlbuffer = rxdlf->GetPayloadBuffer();
@@ -130,12 +130,21 @@ void Operator::_TxWork() {
   if (_canTransmit) {
     _SendPacketWithDesiredState();
     auto lastPktSize = txdlf->GetPacketSize();
-    auto minPktDuration = 11;
+    double maxTr = 175;
+    double tr;
+    if (_rxError) {
+      tr = 50;
+      _rxError = false;
+      std::this_thread::sleep_for(chrono::seconds(2));
+    } else {
+      tr = maxTr;
+    }
+    auto minPktDuration = 10 + WAFrame::PRE_SIZE;
     unsigned long nanos;
     if (lastPktSize >= minPktDuration) {
-      nanos = static_cast<unsigned long>((lastPktSize * 8 / 175. * 1e9));
+      nanos = static_cast<unsigned long>((lastPktSize * 8 / tr * 1e9));
     } else {
-      nanos = static_cast<unsigned long>((minPktDuration * 8 / 175. * 1e9));
+      nanos = static_cast<unsigned long>((minPktDuration * 8 / tr * 1e9));
     }
     std::this_thread::sleep_for(chrono::nanoseconds(nanos));
 
