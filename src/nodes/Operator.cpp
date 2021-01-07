@@ -6,6 +6,7 @@
  */
 
 #include <dccomms/Checksum.h>
+#include <telerobotics/LogUtils.h>
 #include <telerobotics/Operator.h>
 #include <telerobotics/WAFrame.h>
 
@@ -210,6 +211,7 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
     auto srcAddr = rxdlf->GetSrc();
     Log->info("RX FROM {} SEQ {} SIZE {}", srcAddr, rxdlf->GetSeq(),
               rxdlf->GetPacketSize());
+    info_packet(Log, rxdlf);
     if (srcAddr == 1 || !_checkSrcAddr) {
       Log->info("RX PKT {}", rxdlf->GetPacketSize());
 
@@ -319,6 +321,8 @@ void Operator::_WaitForCurrentStateAndNextImageTrunk(int timeout) {
 
   } else {
     Log->warn("ERR PKT {}", rxdlf->GetPacketSize());
+    info_packet(Log, rxdlf);
+    _rxError = true;
   }
 }
 
@@ -397,6 +401,7 @@ void Operator::_SendPacketWithDesiredState() {
       Log->info("TX TO 1 SEQ {} SIZE {}", txdlf->GetSeq(),
                 txdlf->GetPacketSize());
       *_comms << txdlf;
+      info_packet(Log, txdlf);
       while (_comms->BusyTransmitting())
         ;
     }

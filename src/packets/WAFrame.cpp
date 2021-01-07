@@ -3,7 +3,8 @@
 
 namespace telerobotics {
 WAFrame::WAFrame() {
-  _overheadSize = PRE_SIZE + PAYLOAD_SIZE_FIELD + FCS_SIZE;
+  _headerSize = PRE_SIZE + PAYLOAD_SIZE_FIELD;
+  _overheadSize = _headerSize + FCS_SIZE;
   _maxPacketSize = _overheadSize + MAX_PAYLOAD_SIZE;
   _AllocBuffer(_maxPacketSize);
   _Init();
@@ -27,9 +28,7 @@ inline uint8_t *WAFrame::GetPayloadBuffer() { return _payload; }
 
 inline uint32_t WAFrame::GetPayloadSize() { return *_payloadSize; }
 
-inline int WAFrame::GetPacketSize() {
-  return _overheadSize + *_payloadSize;
-}
+inline int WAFrame::GetPacketSize() { return _overheadSize + *_payloadSize; }
 
 void WAFrame::Read(Stream *stream) {
   stream->WaitFor(_pre, PRE_SIZE);
@@ -57,18 +56,17 @@ uint32_t WAFrame::SetPayload(uint8_t *data, uint32_t size) {
 }
 
 void WAFrame::UpdateFCS() {
-  uint16_t crc = Checksum::crc16(_payload, *_payloadSize);
+  uint16_t crc = Checksum::crc16(GetBuffer(), _headerSize + *_payloadSize);
   *_fcs = (uint8_t)(crc >> 8);
   *(_fcs + 1) = (uint8_t)(crc & 0xff);
 }
 
 bool WAFrame::_CheckFCS() {
-  uint16_t crc = Checksum::crc16(_payload, *_payloadSize + FCS_SIZE);
+  uint16_t crc =
+      Checksum::crc16(GetBuffer(), _headerSize + *_payloadSize + FCS_SIZE);
   return crc == 0;
 }
 bool WAFrame::IsOk() { return _CheckFCS(); }
-PacketPtr WAFrame::Create(){
-    return CreateObject<WAFrame>();
-}
+PacketPtr WAFrame::Create() { return CreateObject<WAFrame>(); }
 CLASS_LOADER_REGISTER_CLASS(WAFrameBuilder, IPacketBuilder)
-}
+} // namespace telerobotics

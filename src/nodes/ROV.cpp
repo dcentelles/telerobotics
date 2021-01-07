@@ -6,6 +6,7 @@
  */
 
 #include <dccomms/Checksum.h>
+#include <telerobotics/LogUtils.h>
 #include <telerobotics/ROV.h>
 
 namespace telerobotics {
@@ -148,6 +149,7 @@ void ROV::_WaitForNewOrders() {
     auto srcAddr = _rxdlf->GetSrc();
     Log->info("RX FROM {} SEQ {} SIZE {}", srcAddr, _rxdlf->GetSeq(),
               _rxdlf->GetPacketSize());
+    info_packet(Log, _rxdlf);
     if (srcAddr == 2 || !_checkSrcAddr) {
       auto psize = _rxdlf->GetPayloadSize();
       if (psize < 1) {
@@ -173,6 +175,7 @@ void ROV::_WaitForNewOrders() {
     }
   } else {
     Log->warn("ERR PKT {}", _rxdlf->GetPacketSize());
+    info_packet(Log, _rxdlf);
   }
 }
 
@@ -357,6 +360,7 @@ void ROV::_SendPacketWithCurrentStateAndImgTrunk(
     Log->info("TX TO 2 SEQ {} SIZE {}", _txdlf->GetSeq(),
               _txdlf->GetPacketSize());
     *_comms << _txdlf;
+    info_packet(Log, _txdlf);
     if (block) {
       auto lastPktSize = _txdlf->GetPacketSize();
       lock.unlock();

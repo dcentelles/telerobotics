@@ -107,6 +107,7 @@ SET(${PROJECT_NAME}_CPP_FILES
                         src/msgs/HROVMessage.cpp
                         src/msgs/HROVMessageV2.cpp
                         src/msgs/TeleopOrder.cpp
+                        src/LogUtils.cpp
                         )
 
 SET(${PROJECT_NAME}_CXX_COMPILE_FLAGS "-fPIC -std=c++14")
